@@ -1,0 +1,16 @@
+# build artifacts / dependencies — always rebuilt inside the image
+**/bin
+**/obj
+Rambler.Client/web/node_modules
+Rambler.Client/web/build
+
+# local dev / VCS / secrets
+.git
+.vscode
+**/.vscode
+**/appsettings.*.json
+Rambler.Server/appsettings.json
+
+# docs & misc
+*.md
+images

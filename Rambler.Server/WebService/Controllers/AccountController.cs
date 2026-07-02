@@ -170,7 +170,16 @@
                 return BadRequest(ModelState);
             }
 
-            await GenerateValidateEmail(user);
+            if (emailSender.IsConfigured)
+            {
+                await GenerateValidateEmail(user);
+            }
+            else
+            {
+                // no SMTP to send a verification link (e.g. local/dev) -> auto-confirm
+                // so the account is immediately usable. LoginUser requires a confirmed email.
+                user.EmailConfirmed = true;
+            }
 
             await db.SaveChangesAsync();
 

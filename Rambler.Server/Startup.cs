@@ -84,6 +84,7 @@
                 // BOTS EVERYWHERE
                 .AddSingleton<BotService>()
                 .AddTransient<InitializeBots>()
+                .AddTransient<InitializeChannels>()
 
                 .AddTransient<ICaptchaService, CaptchaService>()
 
@@ -161,14 +162,20 @@
             services.ConfigureApplicationCookie(options =>
             {
                 // Cookie settings
+                var sameSite = Enum.TryParse<SameSiteMode>(siteOptions.CookieSameSite, true, out var ss)
+                    ? ss : SameSiteMode.None;
+                var securePolicy = Enum.TryParse<CookieSecurePolicy>(siteOptions.CookieSecure, true, out var sp)
+                    ? sp : CookieSecurePolicy.None;
+
                 options.Cookie = new CookieBuilder
                 {
-                    Domain = siteOptions.CookieDomain,
+                    // empty domain -> host-only cookie (works for both localhost and 127.0.0.1)
+                    Domain = string.IsNullOrWhiteSpace(siteOptions.CookieDomain) ? null : siteOptions.CookieDomain,
                     HttpOnly = true,
                     Name = siteOptions.CookieIdentity,
                     Path = "/",
-                    SameSite = SameSiteMode.None,
-                    SecurePolicy = CookieSecurePolicy.None,
+                    SameSite = sameSite,
+                    SecurePolicy = securePolicy,
                     Expiration = TimeSpan.FromDays(30),
                 };
                 options.ExpireTimeSpan = TimeSpan.FromDays(30);
@@ -294,10 +301,17 @@
                 var provider = new FileExtensionContentTypeProvider();
                 provider.Mappings[".svg"] = "image/svg+xml";
 
-                app.UseDefaultFiles();
+                var fileProvider = new PhysicalFileProvider(dir.FullName);
+
+                // map "/" to index.html using the SAME provider the static files come from
+                // (the default UseDefaultFiles() looks at the web root, not this dir)
+                app.UseDefaultFiles(new DefaultFilesOptions()
+                {
+                    FileProvider = fileProvider,
+                });
                 app.UseStaticFiles(new StaticFileOptions()
                 {
-                    FileProvider = new PhysicalFileProvider(dir.FullName),
+                    FileProvider = fileProvider,
                     //RequestPath = new PathString("/web"),
                     ContentTypeProvider = provider,
                 });

@@ -2,3 +2,6 @@
 Rambler.Contracts/obj/*
 Rambler.Server/obj/*
 Rambler.Test/obj/*
+
+# local env / secrets (use .env.example as the template)
+.env

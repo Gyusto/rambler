@@ -21,6 +21,12 @@
 
         public async Task<bool> IsIpBlacklisted(IPAddress ip)
         {
+            // no DNSBL servers configured -> nothing to check against
+            if (options?.Servers == null)
+            {
+                return false;
+            }
+
             foreach (var server in options.Servers)
             {
                 try

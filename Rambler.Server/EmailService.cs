@@ -19,8 +19,24 @@
             this.log = log;
         }
 
+        /// <summary>
+        /// True when SMTP is configured. When false, emails are skipped (e.g. local/dev).
+        /// </summary>
+        public bool IsConfigured =>
+            !string.IsNullOrWhiteSpace(options?.EmailFrom) && !string.IsNullOrWhiteSpace(options?.Host);
+
         public async Task SendEmailAsync(string emailTo, string subject, string body, bool isBodyHtml = true)
         {
+            // no SMTP configured (e.g. local/dev) -> skip sending rather than throwing,
+            // so registration / password reset / email verification still succeed.
+            if (string.IsNullOrWhiteSpace(options?.EmailFrom) || string.IsNullOrWhiteSpace(options?.Host))
+            {
+                log.LogWarning("Email is not configured (Email:From / Email:Host missing); skipping email to {emailTo} with subject '{subject}'.",
+                    emailTo,
+                    subject);
+                return;
+            }
+
             log.LogDebug($"Sending to {emailTo} from {options.EmailFrom} with subject '{subject}'",
                 emailTo,
                 options.EmailFrom,

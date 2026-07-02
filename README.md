@@ -50,6 +50,39 @@ The chat is powered by a C#/DotNet backend using WebApi and Entity Framework. It
 
 The Frontend is AngularJS (old Angular). There's not too much special there, except we are using Typescript with it to make things simplier.
 
+### Run with Docker (quick start)
+
+The fastest way to get a full instance running locally — no .NET SDK, Node, or Postgres install required. You only need [Docker](https://docs.docker.com/get-docker/) with Compose.
+
+```sh
+# 1. Create your local config from the template
+cp .env.example .env
+
+# 2. Build the client + server and start everything (Postgres + app)
+docker compose up --build
+
+# 3. Open the app
+#    http://localhost:5000
+```
+
+That's it. On first boot the stack:
+
+- builds the AngularJS/TypeScript client and the .NET server into a single image,
+- starts Postgres and **applies database migrations automatically**,
+- seeds a default public **Lobby** channel so there's a room to land in.
+
+Then register an account (or join as a guest) and you're chatting.
+
+Notes:
+
+- All configuration lives in `.env` (see `.env.example` for every value). **Change `TOKEN_SECRET` and the Postgres password before exposing this anywhere.**
+- Email/SMTP is optional — when it isn't configured, email verification is skipped and new accounts are auto-confirmed so login works out of the box. Set the `Email` values for real verification emails.
+- The default Lobby's owner is set by `SITE_LOBBY_OWNER` in `.env`.
+- Editing `.env` only needs `docker compose up -d` (no rebuild). Changing server or client source needs `docker compose up -d --build`.
+- Common commands: `docker compose logs -f server` (tail logs), `docker compose down` (stop, keep data), `docker compose down -v` (stop and wipe the database).
+
+The rest of this section covers the manual (Visual Studio) setup.
+
 ### Prerequisites
 
 - .Net 5 SDK
