@@ -50,20 +50,20 @@
         }
 
         [HttpGet]
+        [AllowAnonymous]
         public IActionResult GetChannels(string search)
         {
-            if (string.IsNullOrWhiteSpace(search))
-            {
-                return null;
-            }
-            else
-            {
-                var results = db.Channels
-                    .Where(c => c.Name.ToLower().Contains(search.ToLower()) && !c.IsSecret)
-                    .Select(c => FromDbChannel(c));
+            var query = db.Channels.Where(c => !c.IsSecret);
 
-                return Ok(results);
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var s = search.ToLower();
+                query = query.Where(c => c.Name.ToLower().Contains(s));
             }
+
+            var results = query.Select(c => FromDbChannel(c)).ToList();
+
+            return Ok(results);
         }
 
         [HttpPost]

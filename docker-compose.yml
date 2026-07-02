@@ -39,5 +39,23 @@ services:
     ports:
       - "${APP_PORT}:5000"
 
+  # New Next.js frontend (coexists with the legacy AngularJS client on the server).
+  # Browser -> web-next (:5001) for the UI; /api is proxied to the .NET server,
+  # and the WebSocket connects straight to the server on :5000.
+  web-next:
+    build:
+      context: ./Rambler.Web.Next
+      dockerfile: Dockerfile
+      args:
+        # inlined into the client bundle at build time (browser-reachable ws)
+        NEXT_PUBLIC_WS_URL: "${NEXT_PUBLIC_WS_URL}"
+    depends_on:
+      - server
+    environment:
+      # server-side proxy target for /api rewrites (Docker network)
+      BACKEND_URL: "http://server:5000"
+    ports:
+      - "${WEB_NEXT_PORT}:5001"
+
 volumes:
   rambler-db:

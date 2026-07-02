@@ -1,0 +1,138 @@
+@import 'common.scss';
+
+/* =========================================================================
+   Modern design layer — glassmorphism, living gradient, micro-interactions,
+   neon accents. Overrides on top of the existing styles (compiled + injected
+   automatically by the gulp build). Keeps the existing purple/turquoise theme.
+   ========================================================================= */
+
+/* ---------- Living gradient backdrop ----------------------------------- */
+/* A slow-drifting translucent gradient layered over the app background so the
+   backdrop subtly breathes. pointer-events:none keeps everything clickable. */
+.chat::before {
+  content: "";
+  position: absolute;
+  top: -20%;
+  left: -20%;
+  right: -20%;
+  bottom: -20%;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg,
+      rgba(63, 188, 166, 0.20) 0%,
+      rgba(81, 69, 110, 0.00) 40%,
+      rgba(137, 94, 228, 0.22) 70%,
+      rgba(63, 188, 166, 0.15) 100%);
+  background-size: 220% 220%;
+  mix-blend-mode: screen;
+  animation: rambler-drift 26s ease-in-out infinite;
+}
+
+@keyframes rambler-drift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ---------- Glassmorphism panels --------------------------------------- */
+@mixin glass($bg, $blur: 16px) {
+  background: $bg;
+  -webkit-backdrop-filter: blur($blur) saturate(140%);
+  backdrop-filter: blur($blur) saturate(140%);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+/* top bar */
+.chat .header {
+  @include glass(rgba(33, 41, 79, 0.35), 16px);
+  border-bottom: 1px solid rgba(78, 186, 165, 0.35); /* turquoise accent line */
+}
+
+/* dialogs (leave the decorative pink-circles popup untouched) */
+.popup:not(.pink-circles) {
+  @include glass(rgba(33, 41, 79, 0.55), 18px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* room list */
+.channel-list-modal .popup {
+  @include glass(rgba(33, 41, 79, 0.55), 18px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* desktop dropdown menu */
+.chat .header .menu-desktop .menu {
+  @include glass(rgba(20, 22, 45, 0.6), 12px);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+/* ---------- Message + micro-interactions ------------------------------- */
+/* new messages fade + slide in */
+.chat .chat-screen .chat-box .chat-item {
+  animation: rambler-msg-in 0.22s ease-out both;
+}
+
+@keyframes rambler-msg-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* frost the message bubbles and lift them on hover */
+.chat .chat-bubble {
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+  }
+}
+
+/* input glow on focus + tactile send/emoji icons */
+.chat .chat-input {
+  transition: box-shadow 0.15s ease;
+  &:focus-within {
+    box-shadow: 0 0 0 1px rgba(78, 186, 165, 0.5),
+                0 0 16px rgba(78, 186, 165, 0.35);
+  }
+  img.send-icon,
+  img.emoji-icon {
+    transition: transform 0.12s ease, filter 0.12s ease;
+    &:hover {
+      transform: scale(1.15);
+      filter: drop-shadow(0 0 6px $popup-button);
+    }
+  }
+}
+
+/* generic buttons get a subtle lift */
+button.solid,
+button.pink,
+button.white {
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    filter: brightness(1.03);
+  }
+}
+
+/* ---------- Neon accents ----------------------------------------------- */
+/* active room name in the header */
+.chat .header .title {
+  text-shadow: 0 0 10px rgba(78, 186, 165, 0.45);
+}
+
+/* your own messages get a soft glow on the name */
+.chat .chat-text.self .name {
+  text-shadow: 0 0 8px rgba(217, 104, 108, 0.6);
+}
+
+/* rooms glow turquoise on hover in the list */
+.channel-list-modal .list .header .name {
+  transition: color 0.12s ease, text-shadow 0.12s ease;
+}
+.channel-list-modal .list a:hover .header .name {
+  color: $highlight-colour;
+  text-shadow: 0 0 10px rgba(78, 186, 165, 0.5);
+}

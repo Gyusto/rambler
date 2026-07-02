@@ -41,6 +41,7 @@
         }
 
         [HttpGet]
+        [AllowAnonymous]
         public async Task<IActionResult> GetRooms(string search)
         {
             var results = await mutator.Enqueue(state =>
