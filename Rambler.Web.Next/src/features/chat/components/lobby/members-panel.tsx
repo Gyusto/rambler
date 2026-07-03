@@ -5,7 +5,7 @@ import { useChatStore } from "@/features/chat/state/chat-store";
 import { roleBadge, roleMark as marks } from "@/features/chat/roles";
 import { channelsApi } from "@/features/chat/api/channels.api";
 import { settingsApi } from "@/features/chat/api/settings.api";
-import { BanLevel, type ChannelBanDto } from "@/features/chat/api/channels.types";
+import { BanLevel, type ChannelBanDto, type ChannelModeratorDto } from "@/features/chat/api/channels.types";
 import type { RoomUser } from "@/types/protocol";
 import { UserMenu } from "./user-menu";
 
@@ -31,7 +31,9 @@ export function MembersPanel({ open }: { open: boolean }) {
   );
   const isRoom = active?.kind === "room";
   const myLevel = active?.myLevel ?? 0;
+  // Kick/ban needs Moderator(10); promoting/demoting a role needs Admin(100).
   const canModerateRoom = isRoom && myLevel >= 10;
+  const canManageRoom = isRoom && myLevel >= 100;
 
   return (
     <aside className={`members${open ? " open" : ""}`}>
@@ -47,8 +49,10 @@ export function MembersPanel({ open }: { open: boolean }) {
         {users.map((u) => {
           const role = roleBadge(u);
           const isSelf = u.Id === userId;
-          // can moderate this user: I'm a room mod, it's not me, and they don't outrank me
-          const canModerate = canModerateRoom && !isSelf && u.ModLevel < myLevel;
+          // I can act on this user only if they don't outrank me and it's not me.
+          const outranksTarget = !isSelf && u.ModLevel < myLevel;
+          const canModerate = canModerateRoom && outranksTarget;
+          const canManage = canManageRoom && outranksTarget;
 
           return (
             <UserMenu
@@ -56,12 +60,21 @@ export function MembersPanel({ open }: { open: boolean }) {
               user={u}
               isSelf={isSelf}
               canModerate={canModerate}
+              canManage={canManage}
               onMessage={() => openDm(u.Id, u.Nick)}
               onIgnore={() => {
                 void settingsApi.addIgnore(u.Id);
               }}
               onSetMode={(level) => {
-                if (active) void channelsApi.setChannelModeratorLevel(active.id, u.Id, level);
+                if (!active) return;
+                // Grant/upgrade via AddModerator (it upserts); clear via RemoveModerator.
+                if (level <= 0) {
+                  void channelsApi.removeChannelModerator(active.id, {
+                    UserId: u.Id,
+                  } as ChannelModeratorDto);
+                } else {
+                  void channelsApi.addChannelModerator(active.id, u.Id, level);
+                }
               }}
               onKick={() => {
                 if (active) void channelsApi.addChannelBan(buildBanDto(active.id, u, BanLevel.Mute));

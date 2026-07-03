@@ -3,13 +3,17 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { RoomUser } from "@/types/protocol";
 
-// Channel-mode target levels (Anope-style): op/half-op/voice, and none.
-export const MODE = { OP: 5, HALFOP: 4, VOICE: 3, NONE: 0 } as const;
+// Role levels that map to the backend ModerationLevel enum:
+// Operator = Admin (full room control), Moderator = can kick/ban/warn, None = clear role.
+export const MODE = { OPERATOR: 100, MODERATOR: 10, NONE: 0 } as const;
 
 interface UserMenuProps {
   user: RoomUser;
   isSelf: boolean;
+  /** can kick/ban this user (caller is Moderator+) */
   canModerate: boolean;
+  /** can promote/demote this user's role (caller is Admin/Owner) */
+  canManage: boolean;
   onMessage: () => void | Promise<void>;
   onIgnore: () => void | Promise<void>;
   onSetMode: (level: number) => void | Promise<void>;
@@ -24,6 +28,7 @@ export function UserMenu({
   user,
   isSelf,
   canModerate,
+  canManage,
   onMessage,
   onIgnore,
   onSetMode,
@@ -132,28 +137,23 @@ export function UserMenu({
             <i className="fa-solid fa-user-slash w-4 text-center text-[var(--muted)]" /> Ignore
           </button>
 
+          {canManage && (
+            <>
+              <div className={label}>Role</div>
+              <button type="button" role="menuitem" className={item} onClick={act(() => onSetMode(MODE.OPERATOR))}>
+                <i className="fa-solid fa-crown w-4 text-center text-[var(--muted)]" /> Make Operator
+              </button>
+              <button type="button" role="menuitem" className={item} onClick={act(() => onSetMode(MODE.MODERATOR))}>
+                <i className="fa-solid fa-star w-4 text-center text-[var(--muted)]" /> Make Moderator
+              </button>
+              <button type="button" role="menuitem" className={item} onClick={act(() => onSetMode(MODE.NONE))}>
+                <i className="fa-regular fa-circle w-4 text-center text-[var(--muted)]" /> Remove role
+              </button>
+            </>
+          )}
+
           {canModerate && (
             <>
-              <div className={label}>Channel modes</div>
-              <button type="button" role="menuitem" className={item} onClick={act(() => onSetMode(MODE.OP))}>
-                <i className="fa-solid fa-crown w-4 text-center text-[var(--muted)]" /> Make Operator (+o)
-              </button>
-              <button type="button" role="menuitem" className={item} onClick={act(() => onSetMode(MODE.NONE))}>
-                <i className="fa-regular fa-circle w-4 text-center text-[var(--muted)]" /> Remove Operator (-o)
-              </button>
-              <button type="button" role="menuitem" className={item} onClick={act(() => onSetMode(MODE.HALFOP))}>
-                <i className="fa-solid fa-shield-halved w-4 text-center text-[var(--muted)]" /> Make Half-Operator (+h)
-              </button>
-              <button type="button" role="menuitem" className={item} onClick={act(() => onSetMode(MODE.NONE))}>
-                <i className="fa-regular fa-shield w-4 text-center text-[var(--muted)]" /> Remove Half-Operator (-h)
-              </button>
-              <button type="button" role="menuitem" className={item} onClick={act(() => onSetMode(MODE.VOICE))}>
-                <i className="fa-solid fa-microphone w-4 text-center text-[var(--muted)]" /> Give Voice (+v)
-              </button>
-              <button type="button" role="menuitem" className={item} onClick={act(() => onSetMode(MODE.NONE))}>
-                <i className="fa-solid fa-microphone-slash w-4 text-center text-[var(--muted)]" /> Remove Voice (-v)
-              </button>
-
               <div className={label}>User actions</div>
               <button type="button" role="menuitem" className={danger} onClick={act(onKick)}>
                 <i className="fa-solid fa-user-xmark w-4 text-center" /> Kick User

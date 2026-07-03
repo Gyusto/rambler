@@ -51,6 +51,8 @@ interface ChatState {
   sendTyping: (isTyping: boolean) => void;
   /** prepend loaded history to a conversation (idempotent-ish: only if empty). */
   hydrateHistory: (convId: string, msgs: ChatMessage[]) => void;
+  /** mark a conversation's stored history as fetched (so we don't refetch). */
+  markHistoryLoaded: (convId: string) => void;
   clearError: () => void;
 }
 
@@ -175,9 +177,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   hydrateHistory: (convId, msgs) => {
-    // prepend older history above whatever is already there (called once per
-    // room via the rail's `loaded` guard, so no repeated prepending).
+    // prepend older history above whatever is already there (guarded by the
+    // conversation's historyLoaded flag, so no repeated prepending).
     patchConv(get, set, convId, (c) => ({ ...c, messages: [...msgs, ...c.messages] }));
+  },
+
+  markHistoryLoaded: (convId) => {
+    patchConv(get, set, convId, (c) => ({ ...c, historyLoaded: true }));
   },
 
   clearError: () => set({ error: undefined }),

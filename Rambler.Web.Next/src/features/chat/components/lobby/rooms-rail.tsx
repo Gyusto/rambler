@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { getToken, useChatStore } from "@/features/chat/state/chat-store";
 import { messagesApi } from "@/features/chat/api/messages.api";
 import type { ChatMessage, Conversation } from "@/features/chat/types";
@@ -104,22 +104,23 @@ export function RoomsRail() {
   const setActive = useChatStore((s) => s.setActive);
   const closeConversation = useChatStore((s) => s.closeConversation);
   const hydrateHistory = useChatStore((s) => s.hydrateHistory);
+  const markHistoryLoaded = useChatStore((s) => s.markHistoryLoaded);
 
   const list = order.map((id) => conversations[id]).filter(Boolean) as Conversation[];
   const rooms = list.filter((c) => c.kind === "room");
   const dms = list.filter((c) => c.kind === "dm");
 
-  // Load history once per conversation when it becomes active.
-  // Rooms pull channel history; DMs pull the 1:1 thread with the other user.
-  const loaded = useRef<Set<string>>(new Set());
+  // Load stored history the first time a conversation is active. The
+  // `historyLoaded` flag lives on the conversation, so it resets automatically
+  // when a room/DM is closed and later reopened (fresh conversation object) —
+  // no matter which UI closed it.
   useEffect(() => {
     if (!activeId) return;
     const conv = conversations[activeId];
-    if (!conv) return;
-    if (loaded.current.has(activeId)) return;
-    loaded.current.add(activeId);
+    if (!conv || conv.historyLoaded) return;
 
     const convId = activeId;
+    let cancelled = false;
     (async () => {
       try {
         const mapped: ChatMessage[] =
@@ -145,13 +146,17 @@ export function RoomsRail() {
                   self: e.Data.UserId === userId,
                   ts: e.Timestamp,
                 }));
+        if (cancelled) return;
         if (mapped.length > 0) hydrateHistory(convId, mapped);
+        markHistoryLoaded(convId);
       } catch {
-        // history is best-effort; ignore failures
-        loaded.current.delete(convId);
+        // history is best-effort; leave historyLoaded unset so it retries
       }
     })();
-  }, [activeId, conversations, userId, hydrateHistory]);
+    return () => {
+      cancelled = true;
+    };
+  }, [activeId, conversations, userId, hydrateHistory, markHistoryLoaded]);
 
   return (
     <aside className="rooms-rail flex min-h-0 min-w-0 flex-col border-r border-[var(--line)] bg-[color-mix(in_srgb,var(--surface)_55%,transparent)]">

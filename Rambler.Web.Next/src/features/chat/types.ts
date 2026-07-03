@@ -40,4 +40,6 @@ export interface Conversation {
   myLevel: number;
   /** who is currently typing here: userId -> { nick, until (epoch ms) } */
   typing?: Record<string, { nick: string; until: number }>;
+  /** true once stored history has been fetched; resets when the conv is reopened */
+  historyLoaded?: boolean;
 }
