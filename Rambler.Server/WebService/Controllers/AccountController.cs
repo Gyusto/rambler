@@ -503,6 +503,36 @@
         }
 
         /// <summary>
+        /// Rename the signed-in account and return a fresh chat token carrying the
+        /// new nick. Guests change their nick client-side via a new guest token.
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> ChangeNick([FromBody] Register req)
+        {
+            var user = await userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Unauthorized();
+            }
+
+            var nick = req.Nick?.Trim();
+            if (string.IsNullOrWhiteSpace(nick)
+                || nick.ToLower().StartsWith("guest")
+                || !System.Text.RegularExpressions.Regex.IsMatch(nick, "^[\\w-]{1,15}$"))
+            {
+                return BadRequest("Invalid nickname.");
+            }
+
+            var res = await userManager.SetUserNameAsync(user, nick);
+            if (!res.Succeeded)
+            {
+                return BadRequest("That nickname is already taken.");
+            }
+
+            return Ok(CreateTokenForUser(user));
+        }
+
+        /// <summary>
         /// The external login providers configured on this server (empty when
         /// none are set up). The client uses this to decide which "Continue
         /// with ..." buttons to show; each links to /api/account/Login?provider=.

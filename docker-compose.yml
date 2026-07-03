@@ -50,6 +50,8 @@ services:
       Site__CookieIdentity: "${SITE_COOKIE_IDENTITY}"
       Site__EnableCaptcha: "${SITE_ENABLE_CAPTCHA}"
       Site__AutoConfirmEmail: "${SITE_AUTOCONFIRMEMAIL}"
+      Site__AllowAnyOrigin: "${SITE_ALLOWANYORIGIN}"
+      Site__CorsOrigins: "${SITE_CORSORIGINS}"
       Site__LobbyOwner: "${SITE_LOBBY_OWNER}"
       Media__Endpoint: "${MEDIA_ENDPOINT}"
       Media__PublicUrl: "${MEDIA_PUBLIC_URL}"

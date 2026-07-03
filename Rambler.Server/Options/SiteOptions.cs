@@ -29,5 +29,11 @@
 
         // username that owns the auto-seeded default "Lobby" channel (falls back to a system user)
         public string LobbyOwner { get; set; }
+
+        // CORS: comma-separated allow-list (production). Empty -> use AllowAnyOrigin.
+        public string CorsOrigins { get; set; }
+
+        // CORS: when true (and no CorsOrigins set) reflect any origin - handy for local/dev.
+        public bool AllowAnyOrigin { get; set; }
     }
 }

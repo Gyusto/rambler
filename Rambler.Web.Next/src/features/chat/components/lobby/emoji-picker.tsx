@@ -16,7 +16,13 @@ function loadRecent(): string[] {
 export function EmojiPicker({
   onPick,
   onClose,
-}: Readonly<{ onPick: (emoji: string) => void; onClose: () => void }>) {
+  placement = "up",
+}: Readonly<{
+  onPick: (emoji: string) => void;
+  onClose: () => void;
+  /** "up" opens above-left (composer); "down" opens below-right (message toolbar). */
+  placement?: "up" | "down";
+}>) {
   const [cat, setCat] = useState<string>("recent");
   const [recent, setRecent] = useState<string[]>([]);
   const ref = useRef<HTMLDivElement>(null);
@@ -59,10 +65,15 @@ export function EmojiPicker({
       cat === id ? "bg-[var(--raised)] text-[var(--glow-b)]" : "text-[var(--muted)] hover:bg-[var(--raised)]"
     }`;
 
+  const posCls =
+    placement === "down"
+      ? "top-full right-0 mt-2"
+      : "bottom-full left-0 mb-3.5";
+
   return (
     <div
       ref={ref}
-      className="absolute bottom-full left-0 z-50 mb-3.5 w-[min(320px,calc(100vw-2rem))] max-w-[320px] overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow)]"
+      className={`absolute ${posCls} z-50 w-[min(320px,calc(100vw-2rem))] max-w-[320px] overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow)]`}
     >
       <div className="flex items-center gap-0.5 border-b border-[var(--line)] px-2 py-1.5">
         <button type="button" className={tabCls("recent")} title="Recent" onClick={() => setCat("recent")}>

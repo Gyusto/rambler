@@ -117,14 +117,30 @@
 
             services.AddTransient<EmailService>();
 
-            services.AddCors(Options => Options.AddPolicy(
+            // Cross-origin access:
+            //   Site:CorsOrigins    - comma-separated allow-list (use in production)
+            //   Site:AllowAnyOrigin - "true" reflects ANY origin (handy for local/dev).
+            // Reflecting the origin (rather than AllowAnyOrigin()) is what keeps it valid
+            // alongside AllowCredentials(). CorsOrigins wins when both are set.
+            var corsOrigins = Configuration["Site:CorsOrigins"];
+            var allowAnyOrigin = string.Equals(Configuration["Site:AllowAnyOrigin"], "true", StringComparison.OrdinalIgnoreCase);
+            services.AddCors(options => options.AddPolicy(
                 "CorsPolicy",
-                builder => builder
-                    .AllowAnyOrigin()
-                    //.WithHeaders("authorization", "accept", "content-type", "origin")
-                    .AllowAnyMethod()
-                    .AllowAnyHeader()
-                    .AllowCredentials()));
+                builder =>
+                {
+                    builder.AllowAnyMethod().AllowAnyHeader().AllowCredentials();
+                    if (!string.IsNullOrWhiteSpace(corsOrigins))
+                    {
+                        builder.WithOrigins(corsOrigins
+                            .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                            .Select(o => o.Trim())
+                            .ToArray());
+                    }
+                    else if (allowAnyOrigin)
+                    {
+                        builder.SetIsOriginAllowed(_ => true);
+                    }
+                }));
 
             services
                 .AddMvc()

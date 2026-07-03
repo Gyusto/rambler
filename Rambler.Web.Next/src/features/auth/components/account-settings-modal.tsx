@@ -5,7 +5,6 @@ import Link from "next/link";
 import { accountApi } from "@/features/auth/api/account.api";
 import { botApi, type BotSummary } from "@/features/admin/api/bot.api";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { useChatStore } from "@/features/chat/state/chat-store";
 import { Loading, Spinner } from "@/components/ui/spinner";
 
 /** Same rule the server enforces for guest nicks: 1-15 word chars, not "guest*". */
@@ -19,14 +18,19 @@ export function AccountSettingsModal({
   onClose,
 }: Readonly<{ open: boolean; onClose: () => void }>) {
   const isGuest = useAuth((s) => s.session?.isGuest);
+  const currentNick = useAuth((s) => s.session?.nick);
+  const doChangeNick = useAuth((s) => s.changeNick);
 
-  const guestAuth = useAuth((s) => s.guest);
   const [step, setStep] = useState<"request" | "confirm" | "done">("request");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
-  const [nick, setNick] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [nick, setNick] = useState("");
+  const [nickBusy, setNickBusy] = useState(false);
+  const [nickMsg, setNickMsg] = useState<string | null>(null);
+  const [nickErr, setNickErr] = useState<string | null>(null);
 
   // reset on open
   useEffect(() => {
@@ -50,30 +54,27 @@ export function AccountSettingsModal({
 
   if (!open) return null;
 
-  async function changeNick(e: React.FormEvent) {
+  async function submitNick(e: React.FormEvent) {
     e.preventDefault();
     const next = nick.trim();
     if (!next) return;
     if (!validNick(next)) {
-      setError("1-15 letters/numbers, and it can't start with \"guest\".");
+      setNickErr('1-15 letters, numbers, - or _; can’t start with "guest".');
       return;
     }
-    setBusy(true);
-    setError(null);
+    setNickBusy(true);
+    setNickErr(null);
+    setNickMsg(null);
     try {
-      // re-issue a guest token under the new nick, then reconnect the chat with it
-      await guestAuth(next);
-      const token = useAuth.getState().session?.token;
-      if (token) {
-        const chat = useChatStore.getState();
-        chat.disconnect();
-        chat.connect(token, next);
-      }
-      onClose();
+      // re-issues the token under the new nick; the chat connection hook sees
+      // the session change and reconnects with the new identity.
+      await doChangeNick(next);
+      setNickMsg(`You're now "${next}".`);
+      setNick("");
     } catch {
-      setError("Couldn't change your name - it may be taken. Try another.");
+      setNickErr("Couldn't change your nickname — it may be taken. Try another.");
     } finally {
-      setBusy(false);
+      setNickBusy(false);
     }
   }
 
@@ -133,36 +134,35 @@ export function AccountSettingsModal({
         </div>
 
         <div className="px-4 py-4">
+          {/* Change nickname - for guests and registered users alike */}
+          <div className="mb-2 text-sm font-medium">Change nickname</div>
+          <form onSubmit={submitNick} className="flex flex-col gap-2">
+            <input
+              value={nick}
+              onChange={(e) => setNick(e.target.value)}
+              placeholder={currentNick ? `Currently "${currentNick}"` : "New nickname"}
+              maxLength={15}
+              className={inputCls}
+            />
+            <button type="submit" className={primaryBtn} disabled={nickBusy || !nick.trim()}>
+              {nickBusy && <Spinner className="h-4 w-4" />}
+              {nickBusy ? "Changing…" : "Change nickname"}
+            </button>
+            {nickErr && <p className="text-xs text-[var(--danger,#d9686c)]">{nickErr}</p>}
+            {nickMsg && <p className="text-xs text-rambler-turquoise">{nickMsg}</p>}
+          </form>
+
           {isGuest ? (
-            <>
-              <div className="mb-3 text-sm font-medium">Change nickname</div>
-              <form onSubmit={changeNick} className="flex flex-col gap-3">
-                <input
-                  value={nick}
-                  onChange={(e) => setNick(e.target.value)}
-                  placeholder="New nickname"
-                  maxLength={15}
-                  className={inputCls}
-                  autoFocus
-                />
-                <button type="submit" className={primaryBtn} disabled={busy || !nick.trim()}>
-                  {busy && <Spinner className="h-4 w-4" />}
-                  {busy ? "Updating…" : "Update nickname"}
-                </button>
-              </form>
-              <p className="mt-4 text-xs text-[var(--muted)]">
-                Want to keep this name?{" "}
-                <Link href="/register" className="text-[var(--glow-b)] hover:underline">
-                  Register an account
-                </Link>
-                .
-              </p>
-              {error && (
-                <p className="mt-3 text-center text-sm text-[var(--danger,#d9686c)]">{error}</p>
-              )}
-            </>
+            <p className="mt-3 text-xs text-[var(--muted)]">
+              Guests can use any free name. Want to keep it?{" "}
+              <Link href="/register" className="text-[var(--glow-b)] hover:underline">
+                Create an account
+              </Link>
+              .
+            </p>
           ) : (
             <>
+              <div className="my-4 border-t border-[var(--line)]" />
               <div className="mb-3 text-sm font-medium">Change email</div>
 
               {step === "request" && (

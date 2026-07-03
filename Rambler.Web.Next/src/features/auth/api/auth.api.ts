@@ -20,6 +20,10 @@ export const authApi = {
   guestToken: (nick: string) =>
     http.post<string>("/Account/GuestChatToken", { Nick: nick }),
 
+  /** Rename the signed-in account; returns a fresh chat token. */
+  changeNick: (nick: string) =>
+    http.post<string>("/Account/ChangeNick", { Nick: nick }),
+
   /**
    * External login providers configured on the server (empty when none are set
    * up). Each provider's `Name` is passed to the redirect entry point

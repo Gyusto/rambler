@@ -262,6 +262,7 @@ function MessageToolbar({ m, btnClass }: Readonly<{ m: ChatMessage; btnClass: st
         </button>
         {pickerOpen && (
           <EmojiPicker
+            placement="down"
             onPick={(emoji) => {
               react(emoji);
               setPickerOpen(false);

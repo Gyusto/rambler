@@ -17,6 +17,8 @@ interface AuthState {
   login: (input: LoginInput) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
   guest: (nick: string) => Promise<void>;
+  /** Change the current nickname (re-issues the token; chat reconnects). */
+  changeNick: (nick: string) => Promise<void>;
 }
 
 /**
@@ -26,7 +28,7 @@ interface AuthState {
  */
 export const useAuth = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       session: null,
       hydrated: false,
 
@@ -59,6 +61,14 @@ export const useAuth = create<AuthState>()(
       guest: async (nick) => {
         const token = await authApi.guestToken(nick);
         set({ session: { token, nick, isGuest: true } });
+      },
+
+      changeNick: async (nick) => {
+        const s = get().session;
+        if (!s) return;
+        // guests get a fresh guest token; registered users rename the account.
+        const token = s.isGuest ? await authApi.guestToken(nick) : await authApi.changeNick(nick);
+        set({ session: { ...s, token, nick } });
       },
     }),
     {
