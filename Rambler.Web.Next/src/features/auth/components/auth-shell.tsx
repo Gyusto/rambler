@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-
-const GITHUB_URL = "https://github.com/8labs/rambler";
+import { SiteFooter } from "@/components/layout/site-footer";
 
 const accents = {
   turquoise: "bg-rambler-turquoise/15 text-rambler-turquoise",
@@ -59,7 +58,9 @@ interface AuthShellProps {
  */
 export function AuthShell({ title, subtitle, children }: AuthShellProps) {
   return (
-    <div className="relative min-h-dvh w-full bg-rambler-indigo lg:grid lg:grid-cols-2">
+    <div className="relative flex h-dvh w-full flex-col overflow-hidden bg-rambler-indigo">
+      {/* Split-screen area fills the viewport minus the footer */}
+      <div className="relative min-h-0 w-full flex-1 lg:grid lg:grid-cols-2">
       {/* Left: branded showcase (lg+) */}
       <aside className="relative hidden overflow-hidden border-r border-white/5 bg-[#1b2140] px-12 py-10 lg:flex lg:flex-col xl:px-16">
         {/* soft turquoise pool behind the device shot */}
@@ -124,38 +125,31 @@ export function AuthShell({ title, subtitle, children }: AuthShellProps) {
         </div>
       </aside>
 
-      {/* Right: form card */}
-      <main className="flex min-h-dvh items-center justify-center px-4 py-10 sm:px-6 lg:min-h-0">
+      {/* Right: form card - centered but allowed to shrink, scrolls internally
+          only as a last resort so the page itself never scrolls */}
+      <main className="flex min-h-0 items-center justify-center overflow-y-auto px-4 py-6 sm:px-6">
         <div className="w-full max-w-sm">
           {/* logo above the card - mobile only, links home */}
           <Link
             href="/"
-            className="mb-8 flex items-center justify-center gap-2.5 lg:hidden"
+            className="mb-5 flex items-center justify-center gap-2.5 lg:hidden"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/ewclogo.svg" alt="Rambler" className="h-8 w-auto" />
             <span className="text-xl font-semibold text-white">Rambler</span>
           </Link>
 
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-8 shadow-2xl shadow-black/40">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40 sm:p-7">
             <h1 className="text-2xl font-semibold text-white">{title}</h1>
-            <p className="mb-6 mt-1 text-sm text-white/50">{subtitle}</p>
+            <p className="mb-5 mt-1 text-sm text-white/50">{subtitle}</p>
             {children}
           </div>
-
-          <p className="mt-6 text-center text-xs text-white/40">
-            Rambler · open source chat ·{" "}
-            <a
-              href={GITHUB_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-white/60 hover:text-white"
-            >
-              <i className="fa-brands fa-github" /> GitHub
-            </a>
-          </p>
         </div>
       </main>
+      </div>
+
+      {/* Shared footer, pinned at the bottom of the single viewport */}
+      <SiteFooter compact />
     </div>
   );
 }

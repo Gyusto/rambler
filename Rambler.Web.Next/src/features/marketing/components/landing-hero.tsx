@@ -11,9 +11,8 @@ import { ArchitectureSection } from "@/features/marketing/components/architectur
 import { ScreenshotGallery } from "@/features/marketing/components/screenshot-gallery";
 import { ImageLightbox } from "@/features/marketing/components/image-lightbox";
 import { SiteHeader } from "@/components/layout/site-header";
+import { SiteFooter } from "@/components/layout/site-footer";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-
-const GITHUB_URL = "https://github.com/8labs/rambler";
 
 const accents = {
   turquoise: "bg-rambler-turquoise/15 text-rambler-turquoise",
@@ -197,30 +196,9 @@ export function LandingHero() {
       <ArchitectureSection />
 
       {/* Footer */}
-      <footer className="mt-auto border-t border-white/10 px-6 py-8">
-        <p className="mx-auto max-w-2xl text-center text-xs leading-relaxed text-white/70">
-          By the way, we use cookies. By registering or using this system you agree to our{" "}
-          <Link href="/tos" className="text-white/90 underline underline-offset-2 hover:text-white">
-            Terms of Service
-          </Link>
-          , and any delicious cookies we decide to stuff your browser with. 🍪
-        </p>
-        <p className="mt-3 flex flex-wrap items-center justify-center gap-1.5 text-center text-xs text-white/50">
-          Rambler · open source chat ·
-          <Link href="/blog" className="text-white/80 hover:text-white">
-            Blog
-          </Link>
-          ·
-          <a
-            href={GITHUB_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-white/80 hover:text-white"
-          >
-            <i className="fa-brands fa-github" /> GitHub
-          </a>
-        </p>
-      </footer>
+      <div className="mt-auto">
+        <SiteFooter />
+      </div>
     </div>
   );
 }

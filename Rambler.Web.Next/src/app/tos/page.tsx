@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/layout/app-shell";
 import { GlassCard } from "@/components/ui/card";
+import { SiteFooter } from "@/components/layout/site-footer";
 
 export default function TermsPage() {
   return (
@@ -32,6 +33,7 @@ export default function TermsPage() {
           </div>
         </GlassCard>
       </div>
+      <SiteFooter />
       </div>
     </AppShell>
   );

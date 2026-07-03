@@ -34,6 +34,8 @@
 
         public DbSet<PostReaction> PostReactions { get; set; }
 
+        public DbSet<BlogComment> BlogComments { get; set; }
+
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
             : base(options)
         {
@@ -89,6 +91,9 @@
             builder.Entity<Bot>()
                 .HasIndex(b => b.Name)
                 .IsUnique();
+
+            builder.Entity<BlogComment>()
+                .HasIndex(c => c.PostSlug);
 
             // Customize the ASP.NET Identity model and override the defaults if needed.
             // For example, you can rename the ASP.NET Identity table names and more.
