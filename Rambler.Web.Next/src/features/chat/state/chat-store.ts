@@ -8,6 +8,7 @@ import {
   type ChannelJoinedData,
   type ChannelMessageData,
   type ChannelTypingData,
+  type DirectTypingData,
   type ChannelPartData,
   type ChannelUpdateData,
   type ChannelUserUpdateData,
@@ -164,9 +165,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendTyping: (isTyping) => {
     const { activeId, conversations } = get();
     const conv = activeId ? conversations[activeId] : undefined;
-    // typing signals are channel-only for now
-    if (!conv || conv.kind !== "room") return;
-    socket?.send(MessageKey.CHTYPING, { ChannelId: conv.id, IsTyping: isTyping });
+    if (!conv) return;
+    if (conv.kind === "room") {
+      socket?.send(MessageKey.CHTYPING, { ChannelId: conv.id, IsTyping: isTyping });
+    } else {
+      // DM: conversation id is the counterpart's user id
+      socket?.send(MessageKey.DMTYPING, { UserId: conv.id, IsTyping: isTyping });
+    }
   },
 
   hydrateHistory: (convId, msgs) => {
@@ -305,6 +310,20 @@ function handle(msg: ResponseEnvelope, set: Setter, get: Getter) {
       const roomId = msg.Subscription;
       if (d.UserId === get().userId) break; // ignore our own echo
       patchConv(get, set, roomId, (c) => {
+        const typing = { ...(c.typing ?? {}) };
+        if (d.IsTyping) typing[d.UserId] = { nick: d.Nick, until: Date.now() + 6000 };
+        else delete typing[d.UserId];
+        return { ...c, typing };
+      });
+      break;
+    }
+    case MessageKey.DMTYPING: {
+      const d = msg.Data as DirectTypingData;
+      // the DM conversation is keyed by the sender's (counterpart's) user id;
+      // patchConv no-ops if we don't have that thread open, so we never
+      // spawn a conversation just for a typing ping.
+      if (d.UserId === get().userId) break;
+      patchConv(get, set, d.UserId, (c) => {
         const typing = { ...(c.typing ?? {}) };
         if (d.IsTyping) typing[d.UserId] = { nick: d.Nick, until: Date.now() + 6000 };
         else delete typing[d.UserId];

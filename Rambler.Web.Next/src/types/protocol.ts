@@ -18,6 +18,7 @@ export const MessageKey = {
   CHBAN: "CHBAN",
   CHWARN: "CHWARN",
   CHTYPING: "CHTYPING",
+  DMTYPING: "DMTYPING",
   ERROR: "ERROR",
   DM: "DM",
 } as const;
@@ -61,6 +62,13 @@ export interface ChannelMessageData {
 }
 
 export interface ChannelTypingData {
+  UserId: string;
+  Nick: string;
+  IsTyping: boolean;
+}
+
+export interface DirectTypingData {
+  /** the user who is typing (the sender / counterpart) */
   UserId: string;
   Nick: string;
   IsTyping: boolean;
