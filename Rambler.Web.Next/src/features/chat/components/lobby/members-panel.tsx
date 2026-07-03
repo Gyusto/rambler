@@ -76,13 +76,11 @@ export function MembersPanel({ open }: { open: boolean }) {
                   void channelsApi.addChannelModerator(active.id, u.Id, level);
                 }
               }}
-              onKick={() => {
+              onMute={() => {
                 if (active) void channelsApi.addChannelBan(buildBanDto(active.id, u, BanLevel.Mute));
               }}
               onBan={() => {
-                if (active) void channelsApi.addChannelBan(buildBanDto(active.id, u, BanLevel.Ban));
-              }}
-              onKickBan={() => {
+                // Ban force-removes the user from the channel (server broadcasts a part) and bans them.
                 if (active) void channelsApi.addChannelBan(buildBanDto(active.id, u, BanLevel.Ban));
               }}
             >

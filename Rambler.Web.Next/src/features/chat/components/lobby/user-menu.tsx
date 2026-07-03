@@ -17,9 +17,10 @@ interface UserMenuProps {
   onMessage: () => void | Promise<void>;
   onIgnore: () => void | Promise<void>;
   onSetMode: (level: number) => void | Promise<void>;
-  onKick: () => void | Promise<void>;
+  /** mute this user in the channel (they stay, but can't post) */
+  onMute: () => void | Promise<void>;
+  /** ban this user (the server also force-removes them from the channel) */
   onBan: () => void | Promise<void>;
-  onKickBan: () => void | Promise<void>;
   /** avatar + name row content */
   children: ReactNode;
 }
@@ -32,9 +33,8 @@ export function UserMenu({
   onMessage,
   onIgnore,
   onSetMode,
-  onKick,
+  onMute,
   onBan,
-  onKickBan,
   children,
 }: UserMenuProps) {
   const [open, setOpen] = useState(false);
@@ -55,11 +55,19 @@ export function UserMenu({
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
+    // The menu is fixed-positioned from a one-time measurement, so any scroll of an
+    // ancestor (e.g. the member roster) would leave it stranded. Close it instead.
+    // Capture phase so it fires for the scrolling ancestor, which doesn't bubble scroll.
+    function onScroll() {
+      setOpen(false);
+    }
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onScroll, true);
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onScroll, true);
     };
   }, [open]);
 
@@ -155,14 +163,11 @@ export function UserMenu({
           {canModerate && (
             <>
               <div className={label}>User actions</div>
-              <button type="button" role="menuitem" className={danger} onClick={act(onKick)}>
-                <i className="fa-solid fa-user-xmark w-4 text-center" /> Kick User
+              <button type="button" role="menuitem" className={danger} onClick={act(onMute)}>
+                <i className="fa-solid fa-comment-slash w-4 text-center" /> Mute User
               </button>
               <button type="button" role="menuitem" className={danger} onClick={act(onBan)}>
                 <i className="fa-solid fa-ban w-4 text-center" /> Ban User
-              </button>
-              <button type="button" role="menuitem" className={danger} onClick={act(onKickBan)}>
-                <i className="fa-solid fa-gavel w-4 text-center" /> Kick &amp; Ban
               </button>
             </>
           )}

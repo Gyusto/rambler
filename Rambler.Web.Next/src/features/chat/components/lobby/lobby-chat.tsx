@@ -7,12 +7,16 @@ import { Composer } from "@/features/chat/components/lobby/composer";
 import { MembersPanel } from "@/features/chat/components/lobby/members-panel";
 import { RoomsRail } from "@/features/chat/components/lobby/rooms-rail";
 import { AppHeader } from "@/features/chat/components/lobby/app-header";
+import { NoRoomsView } from "@/features/chat/components/lobby/no-rooms-view";
 import { useChatStore } from "@/features/chat/state/chat-store";
 
 export function LobbyChat() {
   const [membersOpen, setMembersOpen] = useState(false);
   const error = useChatStore((s) => s.error);
   const clearError = useChatStore((s) => s.clearError);
+  const hasActiveConversation = useChatStore(
+    (s) => s.order.length > 0 && !!s.activeId,
+  );
 
   return (
     <div className="lobby-app">
@@ -45,9 +49,15 @@ export function LobbyChat() {
         <RoomsRail />
 
         <section className="lobby-chat">
-          <TopBar onToggleMembers={() => setMembersOpen((v) => !v)} />
-          <MessageStream />
-          <Composer />
+          {hasActiveConversation ? (
+            <>
+              <TopBar onToggleMembers={() => setMembersOpen((v) => !v)} />
+              <MessageStream />
+              <Composer />
+            </>
+          ) : (
+            <NoRoomsView />
+          )}
         </section>
 
         <MembersPanel open={membersOpen} />

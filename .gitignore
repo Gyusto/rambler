@@ -5,3 +5,7 @@ Rambler.Test/obj/*
 
 # local env / secrets (use .env.example as the template)
 .env
+
+# stray mockup drops
+/images/Jul *
+/images/demo.png

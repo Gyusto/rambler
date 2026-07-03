@@ -47,8 +47,8 @@ interface ChatState {
   setActive: (id: string) => void;
   closeConversation: (id: string) => void;
   sendMessage: (text: string) => void;
-  /** broadcast a typing start/stop for the active room. */
-  sendTyping: (isTyping: boolean) => void;
+  /** broadcast a typing start/stop; targets `convId` if given, else the active conversation. */
+  sendTyping: (isTyping: boolean, convId?: string) => void;
   /** prepend loaded history to a conversation (idempotent-ish: only if empty). */
   hydrateHistory: (convId: string, msgs: ChatMessage[]) => void;
   /** mark a conversation's stored history as fetched (so we don't refetch). */
@@ -164,9 +164,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  sendTyping: (isTyping) => {
+  sendTyping: (isTyping, convId) => {
     const { activeId, conversations } = get();
-    const conv = activeId ? conversations[activeId] : undefined;
+    const targetId = convId ?? activeId;
+    const conv = targetId ? conversations[targetId] : undefined;
     if (!conv) return;
     if (conv.kind === "room") {
       socket?.send(MessageKey.CHTYPING, { ChannelId: conv.id, IsTyping: isTyping });

@@ -13,24 +13,37 @@ export function Composer() {
   const sendTyping = useChatStore((s) => s.sendTyping);
   const active = useChatStore((s) => (s.activeId ? s.conversations[s.activeId] : undefined));
 
-  // Typing signal: emit "start" on first keystroke, throttle re-sends, and
-  // emit "stop" after a short idle gap (or on send / unmount).
+  // Typing signal: emit "start" on first keystroke, re-arm "start" periodically
+  // so the receiver's TTL never lapses mid-typing, and emit "stop" after a short
+  // idle gap (or on send / switch / unmount).
   const typingRef = useRef(false);
   const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // the conversation we last sent a "start" for, so "stop" targets THAT one
+  // (not whatever became active after a switch).
+  const typingConvId = useRef<string | undefined>(undefined);
+  const lastStartSent = useRef(0);
 
   function stopTyping() {
     if (stopTimer.current) clearTimeout(stopTimer.current);
     stopTimer.current = null;
     if (typingRef.current) {
       typingRef.current = false;
-      sendTyping(false);
+      sendTyping(false, typingConvId.current);
+      typingConvId.current = undefined;
     }
   }
 
-  function signalTyping() {
+  function signalTyping(convId: string) {
+    const now = Date.now();
     if (!typingRef.current) {
       typingRef.current = true;
-      sendTyping(true);
+      typingConvId.current = convId;
+      lastStartSent.current = now;
+      sendTyping(true, convId);
+    } else if (now - lastStartSent.current > 3000) {
+      // re-arm "start" so the receiver's 6s TTL keeps refreshing while typing
+      lastStartSent.current = now;
+      sendTyping(true, convId);
     }
     if (stopTimer.current) clearTimeout(stopTimer.current);
     stopTimer.current = setTimeout(stopTyping, 2500);
@@ -93,7 +106,7 @@ export function Composer() {
           onChange={(e) => {
             setText(e.target.value);
             autosize();
-            if (e.target.value.trim()) signalTyping();
+            if (active && e.target.value.trim()) signalTyping(active.id);
             else stopTyping();
           }}
           onKeyDown={(e) => {

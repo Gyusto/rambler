@@ -34,6 +34,7 @@ services:
       Site__CookieSecure: "${SITE_COOKIE_SECURE}"
       Site__CookieIdentity: "${SITE_COOKIE_IDENTITY}"
       Site__EnableCaptcha: "${SITE_ENABLE_CAPTCHA}"
+      Site__AutoConfirmEmail: "${SITE_AUTOCONFIRMEMAIL}"
       Site__LobbyOwner: "${SITE_LOBBY_OWNER}"
       Logging__LogLevel__Default: "${LOG_LEVEL}"
     ports:

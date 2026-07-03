@@ -21,6 +21,12 @@
 
         public bool EnableCaptcha { get; set; }
 
+        // When true AND no SMTP is configured, newly registered users are auto-confirmed
+        // (so accounts are immediately usable without an email verification link).
+        // Intended for local/dev only — MUST stay false in production, otherwise anyone
+        // can register accounts for emails they don't own.
+        public bool AutoConfirmEmail { get; set; }
+
         // username that owns the auto-seeded default "Lobby" channel (falls back to a system user)
         public string LobbyOwner { get; set; }
     }

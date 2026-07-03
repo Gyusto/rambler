@@ -162,10 +162,13 @@
             services.ConfigureApplicationCookie(options =>
             {
                 // Cookie settings
+                // Safe fallbacks for plain-HTTP deploys without explicit config: Lax works over
+                // HTTP (SameSite=None would require the Secure flag, which browsers reject on HTTP),
+                // and SameAsRequest only marks the cookie Secure when the request is HTTPS.
                 var sameSite = Enum.TryParse<SameSiteMode>(siteOptions.CookieSameSite, true, out var ss)
-                    ? ss : SameSiteMode.None;
+                    ? ss : SameSiteMode.Lax;
                 var securePolicy = Enum.TryParse<CookieSecurePolicy>(siteOptions.CookieSecure, true, out var sp)
-                    ? sp : CookieSecurePolicy.None;
+                    ? sp : CookieSecurePolicy.SameAsRequest;
 
                 options.Cookie = new CookieBuilder
                 {
