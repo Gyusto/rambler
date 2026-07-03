@@ -4,9 +4,11 @@ export interface ThemeDef {
   dots: [string, string];
 }
 
-export const DEFAULT_THEME = "twilight";
+export const DEFAULT_THEME = "black";
 
 export const THEMES: ThemeDef[] = [
+  { id: "black", name: "Black", dots: ["#111114", "#7c5cff"] },
+  { id: "gray", name: "Gray", dots: ["#4b4d52", "#9297a0"] },
   { id: "twilight", name: "Twilight", dots: ["#ff8a5b", "#7c5cff"] },
   { id: "midnight", name: "Midnight", dots: ["#38bdf8", "#6366f1"] },
   { id: "ember", name: "Ember", dots: ["#ff7043", "#ff5252"] },

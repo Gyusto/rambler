@@ -4,7 +4,19 @@
 @import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap");
 
 /* ============ THEME TOKENS ============ */
-:root { /* Twilight (default) */
+:root { /* Black (default) */
+  --void:#000000; --surface:#0c0c0f; --surface-2:#141418; --raised:#1c1c22; --line:#2a2a31;
+  --text:#f5f5f7; --text-2:#d6d6db; --muted:#8b8b93; --faint:#5d5d65;
+  --glow-a:#ff8a5b; --glow-b:#7c5cff; --glow-c:#3ec6c0;
+  --av-ink:#000000; --msg-hover:rgba(255,255,255,.045); --veil:rgba(0,0,0,.65); --aurora-op:.05;
+}
+[data-theme="gray"] {
+  --void:#17181b; --surface:#1f2023; --surface-2:#26272b; --raised:#2e3034; --line:#3a3c41;
+  --text:#eceef1; --text-2:#cfd2d7; --muted:#9297a0; --faint:#666b74;
+  --glow-a:#ff8a5b; --glow-b:#7c5cff; --glow-c:#3ec6c0;
+  --av-ink:#0e0f11; --msg-hover:rgba(255,255,255,.04); --veil:rgba(23,24,27,.55); --aurora-op:.06;
+}
+[data-theme="twilight"] {
   --void:#2d2740; --surface:#322b47; --surface-2:#3a3250; --raised:#443a5c; --line:#4c4162;
   --text:#ede8f4; --text-2:#d8d1e6; --muted:#9a8fb0; --faint:#6f6584;
   --glow-a:#ff8a5b; --glow-b:#7c5cff; --glow-c:#3ec6c0;
