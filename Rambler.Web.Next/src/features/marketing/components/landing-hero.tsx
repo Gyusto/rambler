@@ -10,6 +10,7 @@ import { THEMES } from "@/features/theme/themes";
 import { ArchitectureSection } from "@/features/marketing/components/architecture-section";
 import { ScreenshotGallery } from "@/features/marketing/components/screenshot-gallery";
 import { ImageLightbox } from "@/features/marketing/components/image-lightbox";
+import { SiteHeader } from "@/components/layout/site-header";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 
 const GITHUB_URL = "https://github.com/8labs/rambler";
@@ -89,48 +90,8 @@ export function LandingHero() {
 
   return (
     <div className="flex min-h-full flex-col">
-      {/* Full-width nav - sticky */}
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/5 bg-rambler-indigo/70 px-6 py-4 backdrop-blur-md sm:px-10">
-        <div className="flex items-center gap-2.5">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/ewclogo.svg" alt="Rambler" className="h-7 w-auto" />
-          <span className="text-lg font-semibold text-white">Rambler</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/blog"
-            className="hidden rounded-full px-3 py-1.5 text-sm text-white/70 transition-colors hover:bg-white/10 hover:text-white sm:inline-flex"
-          >
-            Blog
-          </Link>
-          <a
-            href={GITHUB_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="View on GitHub"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-          >
-            <i className="fa-brands fa-github text-lg" />
-          </a>
-          {session ? (
-            <Link href="/chat" className={cn(buttonVariants({ variant: "solid", size: "sm" }))}>
-              get started
-            </Link>
-          ) : (
-            <>
-              <Link href="/login" className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
-                Sign in
-              </Link>
-              <Link
-                href="/register"
-                className={cn(buttonVariants({ variant: "solid", size: "sm" }))}
-              >
-                Get started
-              </Link>
-            </>
-          )}
-        </div>
-      </header>
+      {/* Full-width nav - sticky, shared across public pages */}
+      <SiteHeader />
 
       {/* Hero - copy on the left, product shot on the right */}
       <section className="mx-auto grid w-full max-w-6xl items-center gap-10 px-6 py-12 lg:grid-cols-[1fr_1.1fr] lg:gap-14 lg:py-20">

@@ -3,11 +3,12 @@ import Link from "next/link";
 import { AppShell } from "@/components/layout/app-shell";
 import { cn } from "@/lib/utils";
 import { POSTS, getPost, formatPostDate } from "@/features/marketing/blog-data";
-import { BlogHeader, BlogFooter, tagAccent } from "@/features/marketing/components/blog-chrome";
+import { BlogFooter, tagAccent } from "@/features/marketing/components/blog-chrome";
+import { SiteHeader } from "@/components/layout/site-header";
 
-interface Params {
+type Params = Readonly<{
   params: Promise<{ slug: string }>;
-}
+}>;
 
 export function generateStaticParams() {
   return POSTS.map((p) => ({ slug: p.slug }));
@@ -26,7 +27,7 @@ export default async function BlogPostPage({ params }: Params) {
     <AppShell>
       <div className="h-full overflow-y-auto">
         <div className="flex min-h-full flex-col">
-          <BlogHeader />
+          <SiteHeader />
 
           {post ? (
             <article className="mx-auto w-full max-w-2xl px-6 py-14 sm:py-16">
@@ -59,16 +60,16 @@ export default async function BlogPostPage({ params }: Params) {
               </div>
 
               <div className="mt-8 border-t border-white/10 pt-8">
-                {post.body.map((para, i) =>
+                {post.body.map((para) =>
                   para.startsWith("## ") ? (
                     <h2
-                      key={i}
+                      key={para}
                       className="mt-8 text-xl font-semibold text-white first:mt-0"
                     >
                       {para.slice(3)}
                     </h2>
                   ) : (
-                    <p key={i} className="mt-5 text-[15px] leading-relaxed text-white/70 first:mt-0">
+                    <p key={para} className="mt-5 text-[15px] leading-relaxed text-white/70 first:mt-0">
                       {para}
                     </p>
                   ),

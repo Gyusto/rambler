@@ -3,7 +3,8 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Reveal } from "@/components/ui/reveal";
 import { POSTS } from "@/features/marketing/blog-data";
 import { BlogCard } from "@/features/marketing/components/blog-card";
-import { BlogHeader, BlogFooter } from "@/features/marketing/components/blog-chrome";
+import { BlogFooter } from "@/features/marketing/components/blog-chrome";
+import { SiteHeader } from "@/components/layout/site-header";
 
 export const metadata: Metadata = {
   title: "Blog · Rambler",
@@ -15,7 +16,7 @@ export default function BlogIndexPage() {
     <AppShell>
       <div className="h-full overflow-y-auto">
         <div className="flex min-h-full flex-col">
-          <BlogHeader />
+          <SiteHeader />
 
           <section className="mx-auto w-full max-w-6xl px-6 py-16 sm:py-20">
             <Reveal className="mx-auto max-w-2xl text-center">
