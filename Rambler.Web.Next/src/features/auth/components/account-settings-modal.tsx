@@ -5,6 +5,7 @@ import Link from "next/link";
 import { accountApi } from "@/features/auth/api/account.api";
 import { botApi, type BotSummary } from "@/features/admin/api/bot.api";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useChatStore } from "@/features/chat/state/chat-store";
 import { Loading, Spinner } from "@/components/ui/spinner";
 
 /** Same rule the server enforces for guest nicks: 1-15 word chars, not "guest*". */
@@ -66,9 +67,10 @@ export function AccountSettingsModal({
     setNickErr(null);
     setNickMsg(null);
     try {
-      // re-issues the token under the new nick; the chat connection hook sees
-      // the session change and reconnects with the new identity.
+      // persist the new nick (re-issues the token), then broadcast the live
+      // rename so everyone sees "X changed their name to Y" without a reconnect.
       await doChangeNick(next);
+      useChatStore.getState().sendRename(next);
       setNickMsg(`You're now "${next}".`);
       setNick("");
     } catch {

@@ -74,6 +74,8 @@ interface ChatState {
   sendMedia: (url: string, kind: "image" | "file", caption?: string) => void;
   /** toggle an emoji reaction on a post. */
   sendReaction: (postId: number, emoji: string) => void;
+  /** change my nickname live (broadcasts a roster update to my rooms). */
+  sendRename: (nick: string) => void;
   /** set/clear the message the composer is replying to. */
   setReplyTarget: (target?: ReplyTarget) => void;
   /** broadcast a typing start/stop; targets `convId` if given, else the active conversation. */
@@ -215,6 +217,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   sendReaction: (postId, emoji) => {
     socket?.send(MessageKey.REACT, { PostId: postId, Emoji: emoji });
+  },
+
+  sendRename: (nick) => {
+    socket?.send(MessageKey.RENAME, { Nick: nick });
   },
 
   setReplyTarget: (target) => set({ replyTarget: target }),
@@ -429,13 +435,20 @@ function handle(msg: ResponseEnvelope, set: Setter, get: Getter) {
     }
     case MessageKey.CHUSERUPDATE: {
       const d = msg.Data as ChannelUserUpdateData;
+      const roomId = msg.Subscription;
+      const prev = get().conversations[roomId]?.users.find((u) => u.Id === d.UserId);
+      const renamed = !!prev && prev.Nick !== d.Nick;
       const updated: RoomUser = { Id: d.UserId, Nick: d.Nick, IsGuest: d.IsGuest, ModLevel: d.Level };
-      patchConv(get, set, msg.Subscription, (c) => ({
+      patchConv(get, set, roomId, (c) => ({
         ...c,
         users: c.users.some((u) => u.Id === d.UserId)
           ? c.users.map((u) => (u.Id === d.UserId ? updated : u))
           : [...c.users, updated],
       }));
+      if (renamed) {
+        systemMessage(roomId, `${prev!.Nick} changed their name to ${d.Nick}`, get, set);
+        if (d.UserId === get().userId) set({ nick: d.Nick });
+      }
       break;
     }
     case MessageKey.CHUPDATE: {

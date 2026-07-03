@@ -20,6 +20,7 @@ export const MessageKey = {
   CHTYPING: "CHTYPING",
   DMTYPING: "DMTYPING",
   REACT: "REACT",
+  RENAME: "RENAME",
   ERROR: "ERROR",
   DM: "DM",
 } as const;
