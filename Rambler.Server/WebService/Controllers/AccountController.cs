@@ -433,7 +433,7 @@
                 // we want them to reuse their current ID as it makes them easier to ban
                 if (id.IsExpired())
                 {
-                    return Ok(CreateGuestToken(id.UserId));
+                    return Ok(CreateGuestToken(id.UserId, id.Nick));
                 }
                 return Ok(token);
             }
@@ -445,6 +445,9 @@
         public class GuestChatRequest
         {
             public string Data { get; set; }
+
+            /// <summary>The nickname the guest picked (optional).</summary>
+            public string Nick { get; set; }
         }
 
         [HttpPost]
@@ -460,16 +463,27 @@
                 }
             }
 
-            return Ok(CreateGuestToken(Guid.NewGuid()));
+            return Ok(CreateGuestToken(Guid.NewGuid(), req.Nick));
         }
 
-        private string CreateGuestToken(Guid userId)
+        /// <summary>A valid guest nick: 1-15 word chars/hyphen and not the reserved "guest" prefix.</summary>
+        private static bool IsUsableGuestNick(string nick)
         {
-            // TODO guest nickname collisions are a mess
-            var rnd = new Random();
+            return !string.IsNullOrWhiteSpace(nick)
+                && System.Text.RegularExpressions.Regex.IsMatch(nick, "^[\\w-]{1,15}$")
+                && !nick.ToLower().StartsWith("guest");
+        }
+
+        private string CreateGuestToken(Guid userId, string nick = null)
+        {
+            // Honour the picked nick when it's valid; otherwise fall back to a random one.
+            var chosen = IsUsableGuestNick(nick)
+                ? nick
+                : "Guest" + new Random().Next(1000, 10000);
+
             var id = new IdentityToken()
             {
-                Nick = "Guest" + rnd.Next(1000, 10000),
+                Nick = chosen,
                 UserId = userId,
                 IsGuest = true,
                 Level = (int)ApplicationUser.UserLevel.Normal,

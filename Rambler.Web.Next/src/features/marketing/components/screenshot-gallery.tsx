@@ -23,7 +23,7 @@ export function ScreenshotGallery() {
           A closer look
         </h2>
         <p className="mt-4 text-lg text-white/55">
-          Reactions, replies, file sharing, themes -the whole chat, in the wild.
+          Reactions, replies, file sharing, themes - the whole chat, in the wild.
         </p>
       </Reveal>
 

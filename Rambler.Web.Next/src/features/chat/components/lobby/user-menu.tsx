@@ -115,6 +115,11 @@ export function UserMenu({
             <i className="fa-solid fa-envelope text-[12px]" />
           </button>
         )}
+        {!isSelf && (
+          <button type="button" className={iconBtn} title="Ignore" aria-label={`Ignore ${user.Nick}`} onClick={() => onIgnore()}>
+            <i className="fa-solid fa-user-slash text-[12px]" />
+          </button>
+        )}
         {hasMenu && (
           <button
             ref={moreRef}

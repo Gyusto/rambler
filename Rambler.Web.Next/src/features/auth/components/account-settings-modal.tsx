@@ -1,10 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { accountApi } from "@/features/auth/api/account.api";
 import { botApi, type BotSummary } from "@/features/admin/api/bot.api";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useChatStore } from "@/features/chat/state/chat-store";
 import { Loading, Spinner } from "@/components/ui/spinner";
+
+/** Same rule the server enforces for guest nicks: 1-15 word chars, not "guest*". */
+function validNick(nick: string): boolean {
+  return /^[\w-]{1,15}$/.test(nick) && !nick.toLowerCase().startsWith("guest");
+}
 
 /** Account settings dialog: change email + list/reveal bot tokens. Guests get a sign-in prompt. */
 export function AccountSettingsModal({
@@ -13,9 +20,11 @@ export function AccountSettingsModal({
 }: Readonly<{ open: boolean; onClose: () => void }>) {
   const isGuest = useAuth((s) => s.session?.isGuest);
 
+  const guestAuth = useAuth((s) => s.guest);
   const [step, setStep] = useState<"request" | "confirm" | "done">("request");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
+  const [nick, setNick] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,6 +49,33 @@ export function AccountSettingsModal({
   }, [open, onClose]);
 
   if (!open) return null;
+
+  async function changeNick(e: React.FormEvent) {
+    e.preventDefault();
+    const next = nick.trim();
+    if (!next) return;
+    if (!validNick(next)) {
+      setError("1-15 letters/numbers, and it can't start with \"guest\".");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      // re-issue a guest token under the new nick, then reconnect the chat with it
+      await guestAuth(next);
+      const token = useAuth.getState().session?.token;
+      if (token) {
+        const chat = useChatStore.getState();
+        chat.disconnect();
+        chat.connect(token, next);
+      }
+      onClose();
+    } catch {
+      setError("Couldn't change your name - it may be taken. Try another.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function requestChange(e: React.FormEvent) {
     e.preventDefault();
@@ -98,9 +134,33 @@ export function AccountSettingsModal({
 
         <div className="px-4 py-4">
           {isGuest ? (
-            <p className="py-4 text-center text-sm text-[var(--muted)]">
-              Sign in with an account to manage settings.
-            </p>
+            <>
+              <div className="mb-3 text-sm font-medium">Change nickname</div>
+              <form onSubmit={changeNick} className="flex flex-col gap-3">
+                <input
+                  value={nick}
+                  onChange={(e) => setNick(e.target.value)}
+                  placeholder="New nickname"
+                  maxLength={15}
+                  className={inputCls}
+                  autoFocus
+                />
+                <button type="submit" className={primaryBtn} disabled={busy || !nick.trim()}>
+                  {busy && <Spinner className="h-4 w-4" />}
+                  {busy ? "Updating…" : "Update nickname"}
+                </button>
+              </form>
+              <p className="mt-4 text-xs text-[var(--muted)]">
+                Want to keep this name?{" "}
+                <Link href="/register" className="text-[var(--glow-b)] hover:underline">
+                  Register an account
+                </Link>
+                .
+              </p>
+              {error && (
+                <p className="mt-3 text-center text-sm text-[var(--danger,#d9686c)]">{error}</p>
+              )}
+            </>
           ) : (
             <>
               <div className="mb-3 text-sm font-medium">Change email</div>

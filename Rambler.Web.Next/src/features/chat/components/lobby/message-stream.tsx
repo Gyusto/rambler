@@ -78,12 +78,37 @@ export function MessageStream() {
     return m;
   }, [users]);
 
-  // Scroll the stream itself (not scrollIntoView, which would scroll the whole
-  // fixed lobby container and clip the topbar).
-  useEffect(() => {
+  // "stick to bottom": follow new messages, but only while the user is already
+  // near the bottom. Scroll the stream itself (not scrollIntoView, which would
+  // scroll the whole fixed lobby container and clip the topbar).
+  const stick = useRef(true);
+
+  function scrollToBottom() {
     const el = streamRef.current;
     if (el) el.scrollTop = el.scrollHeight;
+  }
+
+  function onScroll() {
+    const el = streamRef.current;
+    if (el) stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+  }
+
+  useEffect(() => {
+    if (stick.current) scrollToBottom();
   }, [messages]);
+
+  // images load asynchronously and grow the content after the scroll above ran,
+  // which used to strand the view mid-stream. Re-scroll when a media element
+  // finishes loading (img load doesn't bubble, so listen in the capture phase).
+  useEffect(() => {
+    const el = streamRef.current;
+    if (!el) return;
+    function onLoad(e: Event) {
+      if ((e.target as HTMLElement).tagName === "IMG" && stick.current) scrollToBottom();
+    }
+    el.addEventListener("load", onLoad, true);
+    return () => el.removeEventListener("load", onLoad, true);
+  }, []);
 
   const rows = useMemo(
     () =>
@@ -101,7 +126,7 @@ export function MessageStream() {
   );
 
   return (
-    <main className="stream" ref={streamRef} aria-live="polite">
+    <main className="stream" ref={streamRef} aria-live="polite" onScroll={onScroll}>
       <div className="daydivider">today</div>
 
       {messages.length === 0 && (
