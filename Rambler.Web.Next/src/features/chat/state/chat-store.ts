@@ -51,7 +51,7 @@ interface ChatState {
   sendTyping: (isTyping: boolean, convId?: string) => void;
   /** prepend loaded history to a conversation (idempotent-ish: only if empty). */
   hydrateHistory: (convId: string, msgs: ChatMessage[]) => void;
-  /** mark a conversation's stored history as fetched (so we don't refetch). */
+  /** mark a conversation's history as fetched so we don't refetch it. */
   markHistoryLoaded: (convId: string) => void;
   clearError: () => void;
 }
@@ -326,9 +326,7 @@ function handle(msg: ResponseEnvelope, set: Setter, get: Getter) {
     }
     case MessageKey.DMTYPING: {
       const d = msg.Data as DirectTypingData;
-      // the DM conversation is keyed by the sender's (counterpart's) user id;
-      // patchConv no-ops if we don't have that thread open, so we never
-      // spawn a conversation just for a typing ping.
+      // DM thread is keyed by the sender's id; patchConv skips it if not open
       if (d.UserId === get().userId) break;
       patchConv(get, set, d.UserId, (c) => {
         const typing = { ...(c.typing ?? {}) };

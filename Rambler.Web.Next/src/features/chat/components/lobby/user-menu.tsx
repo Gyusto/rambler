@@ -55,9 +55,7 @@ export function UserMenu({
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
-    // The menu is fixed-positioned from a one-time measurement, so any scroll of an
-    // ancestor (e.g. the member roster) would leave it stranded. Close it instead.
-    // Capture phase so it fires for the scrolling ancestor, which doesn't bubble scroll.
+    // the menu is fixed-positioned, so close it on scroll instead of leaving it stranded
     function onScroll() {
       setOpen(false);
     }

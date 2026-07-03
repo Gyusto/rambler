@@ -110,10 +110,8 @@ export function RoomsRail() {
   const rooms = list.filter((c) => c.kind === "room");
   const dms = list.filter((c) => c.kind === "dm");
 
-  // Load stored history the first time a conversation is active. The
-  // `historyLoaded` flag lives on the conversation, so it resets automatically
-  // when a room/DM is closed and later reopened (fresh conversation object) —
-  // no matter which UI closed it.
+  // Load stored history the first time a conversation is active. The flag lives
+  // on the conversation, so a closed-then-reopened room/DM fetches again.
   useEffect(() => {
     if (!activeId) return;
     const conv = conversations[activeId];
@@ -150,7 +148,7 @@ export function RoomsRail() {
         if (mapped.length > 0) hydrateHistory(convId, mapped);
         markHistoryLoaded(convId);
       } catch {
-        // history is best-effort; leave historyLoaded unset so it retries
+        // best-effort; leave the flag unset so it retries next time
       }
     })();
     return () => {

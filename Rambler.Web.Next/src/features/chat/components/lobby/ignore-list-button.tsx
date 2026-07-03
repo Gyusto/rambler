@@ -50,7 +50,7 @@ export function IgnoreListButton() {
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
-  // Guests have no persistent account, so there is no ignore list to manage.
+  // guests have no account, so nothing to manage
   if (isGuest) return null;
 
   async function remove(ignore: IgnoreDto) {

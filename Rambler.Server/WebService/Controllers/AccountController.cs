@@ -176,9 +176,7 @@
             }
             else if (siteConfig.AutoConfirmEmail)
             {
-                // no SMTP to send a verification link (e.g. local/dev) and auto-confirm is
-                // explicitly opted in -> auto-confirm so the account is immediately usable.
-                // LoginUser requires a confirmed email. This flag must stay off in production.
+                // no SMTP and auto-confirm opted in (local/dev) - keep this off in production
                 user.EmailConfirmed = true;
             }
 

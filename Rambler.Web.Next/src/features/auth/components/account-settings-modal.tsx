@@ -6,12 +6,7 @@ import { botApi, type BotSummary } from "@/features/admin/api/bot.api";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { Loading, Spinner } from "@/components/ui/spinner";
 
-/**
- * Account settings for the signed-in user. Currently surfaces the change-email
- * flow (RequestEmailChange -> ValidateChangeEmail). Guests have no account, so
- * they see a prompt to sign in instead. Backend has no authenticated
- * change-password endpoint, so only email is offered.
- */
+/** Account settings dialog: change email + list/reveal bot tokens. Guests get a sign-in prompt. */
 export function AccountSettingsModal({
   open,
   onClose,

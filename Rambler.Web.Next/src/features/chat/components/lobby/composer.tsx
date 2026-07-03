@@ -13,13 +13,10 @@ export function Composer() {
   const sendTyping = useChatStore((s) => s.sendTyping);
   const active = useChatStore((s) => (s.activeId ? s.conversations[s.activeId] : undefined));
 
-  // Typing signal: emit "start" on first keystroke, re-arm "start" periodically
-  // so the receiver's TTL never lapses mid-typing, and emit "stop" after a short
-  // idle gap (or on send / switch / unmount).
+  // typing: "start" on first keystroke, re-send while typing, "stop" on idle/send/switch
   const typingRef = useRef(false);
   const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // the conversation we last sent a "start" for, so "stop" targets THAT one
-  // (not whatever became active after a switch).
+  // which conversation we sent "start" for, so "stop" hits the same one after a switch
   const typingConvId = useRef<string | undefined>(undefined);
   const lastStartSent = useRef(0);
 
@@ -41,7 +38,7 @@ export function Composer() {
       lastStartSent.current = now;
       sendTyping(true, convId);
     } else if (now - lastStartSent.current > 3000) {
-      // re-arm "start" so the receiver's 6s TTL keeps refreshing while typing
+      // keep the indicator alive while still typing
       lastStartSent.current = now;
       sendTyping(true, convId);
     }

@@ -25,7 +25,7 @@ export function MembersPanel({ open }: { open: boolean }) {
   const active = useChatStore((s) => (s.activeId ? s.conversations[s.activeId] : undefined));
   const openDm = useChatStore((s) => s.openDm);
 
-  // Rank highest authority first: owner/admin -> operator -> half-op -> voice -> members.
+  // Highest authority first: owner/admin, then moderators, then members.
   const users = [...(active?.users ?? [])].sort(
     (a, b) => b.ModLevel - a.ModLevel || a.Nick.localeCompare(b.Nick),
   );
