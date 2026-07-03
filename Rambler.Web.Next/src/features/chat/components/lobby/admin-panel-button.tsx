@@ -8,13 +8,14 @@ import type {
   ServerUserInfoDto,
   ServerUserSocketDto,
 } from "@/features/admin/api/admin.types";
+import { importApi } from "@/features/admin/api/import.api";
 import { Loading, Spinner } from "@/components/ui/spinner";
 import { ApiError } from "@/lib/api/http";
 
 /** All-zero GUID the server returns in Info.UserId when a nick isn't found. */
 const EMPTY_GUID = "00000000-0000-0000-0000-000000000000";
 
-type Tab = "bans" | "lookup";
+type Tab = "bans" | "lookup" | "import";
 
 /** Turn a thrown API error into a friendly, access-aware message. */
 function messageFor(err: unknown, fallback: string): string {
@@ -101,10 +102,15 @@ function AdminPanelModal({ onClose }: { onClose: () => void }) {
           <TabButton active={tab === "lookup"} onClick={() => setTab("lookup")}>
             User lookup
           </TabButton>
+          <TabButton active={tab === "import"} onClick={() => setTab("import")}>
+            Import
+          </TabButton>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-3">
-          {tab === "bans" ? <BansSection /> : <LookupSection />}
+          {tab === "bans" && <BansSection />}
+          {tab === "lookup" && <LookupSection />}
+          {tab === "import" && <ImportSection />}
         </div>
       </div>
     </div>
@@ -627,6 +633,100 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div className="flex items-center justify-between gap-2">
       <span className="text-xs font-medium text-[var(--muted)]">{label}</span>
       <span className="text-sm">{children}</span>
+    </div>
+  );
+}
+
+type ImportKind = "full" | "users" | "channels";
+
+/** Paste-JSON Anope migration importer (admin-only). */
+function ImportSection() {
+  const [kind, setKind] = useState<ImportKind>("full");
+  const [json, setJson] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [ok, setOk] = useState<string | null>(null);
+
+  async function run() {
+    setBusy(true);
+    setError(null);
+    setOk(null);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(json);
+    } catch {
+      setError("That isn't valid JSON.");
+      setBusy(false);
+      return;
+    }
+    try {
+      if (kind === "full") await importApi.anope(parsed as never);
+      else if (kind === "users") await importApi.registerUsers(parsed as never);
+      else await importApi.registerChannels(parsed as never);
+      setOk("Import completed.");
+    } catch (err) {
+      setError(messageFor(err, "Import failed. Check the payload and try again."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const placeholder =
+    kind === "full"
+      ? '{ "Nicknames": [...], "Channels": [...], "Moderators": [...] }'
+      : kind === "users"
+        ? '[ { "nick": "...", "email": "...", "password": "...", "register_date": "...", "last_connection_date": "..." } ]'
+        : '[ { "name": "...", "founder": "...", "time_registered": "...", "forbidden": false } ]';
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-xs text-[var(--muted)]">
+        Migrate an Anope export. Paste the JSON payload for the selected type.
+      </p>
+
+      <div className="flex flex-wrap gap-1 rounded-md border border-[var(--line)] p-1">
+        {(
+          [
+            { k: "full", label: "Full import" },
+            { k: "users", label: "Users" },
+            { k: "channels", label: "Channels" },
+          ] as const
+        ).map((o) => (
+          <button
+            key={o.k}
+            type="button"
+            onClick={() => setKind(o.k)}
+            className={`flex-1 rounded px-2.5 py-1 text-xs font-medium ${
+              kind === o.k
+                ? "bg-[var(--glow-b)] text-white"
+                : "text-[var(--muted)] hover:bg-[var(--line)] hover:text-[var(--text)]"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+
+      <textarea
+        value={json}
+        onChange={(e) => setJson(e.target.value)}
+        placeholder={placeholder}
+        rows={8}
+        className="w-full resize-y rounded-md border border-[var(--line)] bg-[var(--surface)] px-2.5 py-1.5 font-mono text-xs text-[var(--text)] outline-none placeholder:text-[var(--muted)] focus:border-[var(--glow-b)]"
+      />
+
+      <button
+        type="button"
+        onClick={run}
+        disabled={busy || !json.trim()}
+        className="inline-flex items-center justify-center gap-2 rounded-md bg-[var(--glow-b)] px-3.5 py-1.5 text-sm font-medium text-white hover:brightness-110 disabled:opacity-50"
+      >
+        {busy && <Spinner className="h-4 w-4" />}
+        {busy ? "Importing…" : "Run import"}
+      </button>
+
+      {error && <p className="text-center text-sm text-[var(--danger,#d9686c)]">{error}</p>}
+      {ok && <p className="text-center text-sm text-rambler-turquoise">{ok}</p>}
     </div>
   );
 }

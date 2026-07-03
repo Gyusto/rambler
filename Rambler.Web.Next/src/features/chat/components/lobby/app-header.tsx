@@ -7,6 +7,7 @@ import { RoomBrowser } from "@/features/chat/components/lobby/room-browser";
 import { CreateRoomButton } from "@/features/chat/components/lobby/create-room-button";
 import { IgnoreListButton } from "@/features/chat/components/lobby/ignore-list-button";
 import { AdminPanelButton } from "@/features/chat/components/lobby/admin-panel-button";
+import { AccountSettingsModal } from "@/features/auth/components/account-settings-modal";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 
 /** Full-width top app bar: brand on the left, global actions on the right. */
@@ -15,6 +16,7 @@ export function AppHeader() {
   const nick = useAuth((s) => s.session?.nick);
   const clear = useAuth((s) => s.clear);
   const [browserOpen, setBrowserOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   function logOff() {
     clear();
@@ -52,7 +54,13 @@ export function AppHeader() {
         <button type="button" className={iconBtn} title="Notifications" aria-label="Notifications">
           <i className="fa-regular fa-bell" />
         </button>
-        <button type="button" className={iconBtn} title={nick ?? "You"} aria-label="Your profile">
+        <button
+          type="button"
+          className={iconBtn}
+          title={nick ? `${nick} — account settings` : "Account settings"}
+          aria-label="Account settings"
+          onClick={() => setSettingsOpen(true)}
+        >
           <i className="fa-regular fa-user" />
         </button>
         <button type="button" className={pill} onClick={logOff}>
@@ -61,6 +69,7 @@ export function AppHeader() {
       </div>
 
       <RoomBrowser open={browserOpen} onClose={() => setBrowserOpen(false)} />
+      <AccountSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </header>
   );
 }
