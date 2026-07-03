@@ -24,5 +24,8 @@ namespace Rambler.Server.Database.Models
         public string Body { get; set; }
 
         public DateTime CreatedOn { get; set; }
+
+        /// <summary>Denormalized guest flag so the UI can show a guest badge.</summary>
+        public bool IsGuest { get; set; }
     }
 }

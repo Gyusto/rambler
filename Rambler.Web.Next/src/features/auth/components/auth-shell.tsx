@@ -54,7 +54,7 @@ export function AuthShell({ title, subtitle, children }: Readonly<AuthShellProps
               <span className="text-rambler-turquoise">happen.</span>
             </h2>
             <p className="mt-3 text-base text-white/60">
-              Drop in as a guest or sign in — the room's already going.
+              Drop in as a guest or sign in - the room's already going.
             </p>
           </div>
 

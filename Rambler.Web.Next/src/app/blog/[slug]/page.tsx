@@ -7,6 +7,7 @@ import { tagAccent } from "@/features/marketing/components/blog-chrome";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { CommentSection } from "@/features/blog/components/comment-section";
+import { PostGate } from "@/features/blog/components/post-gate";
 
 type Params = Readonly<{
   params: Promise<{ slug: string }>;
@@ -33,6 +34,7 @@ export default async function BlogPostPage({ params }: Params) {
 
           {post ? (
             <article className="mx-auto w-full max-w-2xl px-6 py-14 sm:py-16">
+              <PostGate slug={post.slug}>
               <Link
                 href="/blog"
                 className="inline-flex items-center gap-2 text-sm text-white/50 transition-colors hover:text-white"
@@ -122,6 +124,7 @@ export default async function BlogPostPage({ params }: Params) {
                   <i className="fa-solid fa-arrow-left text-xs" /> Back to the blog
                 </Link>
               </div>
+              </PostGate>
             </article>
           ) : (
             <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center px-6 py-24 text-center">
