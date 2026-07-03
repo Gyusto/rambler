@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { ForgotPasswordModal } from "@/features/auth/components/forgot-password-modal";
+import { SocialLogins } from "@/features/auth/components/social-logins";
 
 export function LoginForm() {
   const router = useRouter();
@@ -75,6 +76,8 @@ export function LoginForm() {
           )}
         </Button>
       </form>
+
+      <SocialLogins />
 
       <div className="flex items-center gap-3 text-xs text-white/40">
         <span className="h-px flex-1 bg-white/15" />

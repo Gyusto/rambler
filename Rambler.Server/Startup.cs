@@ -211,17 +211,32 @@
 
             var facebook = Configuration.GetSection("Facebook").Get<FacebookAuthOptions>();
             var google = Configuration.GetSection("Google").Get<GoogleAuthOptions>();
-            services.AddAuthentication();
-            //.AddFacebook(o =>
-            //{
-            //    o.ClientId = facebook.ClientId;
-            //    o.ClientSecret = facebook.ClientSecret;
-            //})
-            //.AddGoogle(o =>
-            //{
-            //    o.ClientId = google.ClientId;
-            //    o.ClientSecret = google.ClientSecret;
-            //});
+            var authBuilder = services.AddAuthentication();
+
+            // External providers are registered only when their client id/secret
+            // are supplied via config (e.g. Google__ClientId / Google__ClientSecret).
+            // With no config this is a no-op, so social login simply stays hidden.
+            if (google != null
+                && !string.IsNullOrWhiteSpace(google.ClientId)
+                && !string.IsNullOrWhiteSpace(google.ClientSecret))
+            {
+                authBuilder.AddGoogle(o =>
+                {
+                    o.ClientId = google.ClientId;
+                    o.ClientSecret = google.ClientSecret;
+                });
+            }
+
+            if (facebook != null
+                && !string.IsNullOrWhiteSpace(facebook.ClientId)
+                && !string.IsNullOrWhiteSpace(facebook.ClientSecret))
+            {
+                authBuilder.AddFacebook(o =>
+                {
+                    o.ClientId = facebook.ClientId;
+                    o.ClientSecret = facebook.ClientSecret;
+                });
+            }
 
             ConfigureChatServices(services);
             ConfigureWebApiServices(services);

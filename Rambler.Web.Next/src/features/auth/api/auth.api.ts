@@ -19,4 +19,17 @@ export const authApi = {
   /** Guest token - no account required. */
   guestToken: (nick: string) =>
     http.post<string>("/Account/GuestChatToken", { Nick: nick }),
+
+  /**
+   * External login providers configured on the server (empty when none are set
+   * up). Each provider's `Name` is passed to the redirect entry point
+   * `/api/account/Login?provider={Name}&returnUrl=...` for a full-page OAuth flow.
+   */
+  externalProviders: () =>
+    http.get<ExternalProvider[]>("/Account/ExternalProviders"),
 };
+
+export interface ExternalProvider {
+  Name: string;
+  DisplayName: string;
+}

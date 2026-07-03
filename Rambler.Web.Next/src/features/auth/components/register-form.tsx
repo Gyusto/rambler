@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { SocialLogins } from "@/features/auth/components/social-logins";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -76,6 +77,8 @@ export function RegisterForm() {
           "Create account"
         )}
       </Button>
+
+      <SocialLogins />
 
       <p className="text-center text-sm text-white/60">
         Already have an account?{" "}

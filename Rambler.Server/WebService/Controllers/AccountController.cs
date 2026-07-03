@@ -489,6 +489,20 @@
             return Ok(CreateTokenForUser(user));
         }
 
+        /// <summary>
+        /// The external login providers configured on this server (empty when
+        /// none are set up). The client uses this to decide which "Continue
+        /// with ..." buttons to show; each links to /api/account/Login?provider=.
+        /// </summary>
+        [HttpGet]
+        [AllowAnonymous]
+        public async Task<IActionResult> ExternalProviders()
+        {
+            var schemes = await signInManager.GetExternalAuthenticationSchemesAsync();
+
+            return Ok(schemes.Select(s => new { s.Name, s.DisplayName }));
+        }
+
         private string CreateTokenForUser(ApplicationUser user)
         {
             var id = new IdentityToken()

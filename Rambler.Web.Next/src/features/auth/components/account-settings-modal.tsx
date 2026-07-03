@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { accountApi } from "@/features/auth/api/account.api";
+import { botApi, type BotSummary } from "@/features/admin/api/bot.api";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { Spinner } from "@/components/ui/spinner";
+import { Loading, Spinner } from "@/components/ui/spinner";
 
 /**
  * Account settings for the signed-in user. Currently surfaces the change-email
@@ -159,10 +160,102 @@ export function AccountSettingsModal({
               {error && (
                 <p className="mt-3 text-center text-sm text-[var(--danger,#d9686c)]">{error}</p>
               )}
+
+              <div className="my-4 border-t border-[var(--line)]" />
+              <BotsSection />
             </>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Lists the signed-in user's bots and reveals/copies each bot's API token. */
+function BotsSection() {
+  const [bots, setBots] = useState<BotSummary[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [tokens, setTokens] = useState<Record<string, string>>({});
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      setBots((await botApi.list()) ?? []);
+    } catch {
+      setBots([]);
+      setError("Couldn't load your bots.");
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function reveal(id: string) {
+    setBusyId(id);
+    try {
+      const token = await botApi.getToken(id);
+      setTokens((t) => ({ ...t, [id]: token }));
+    } catch {
+      setError("Couldn't fetch that token.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div>
+      <div className="mb-2 text-sm font-medium">Bots</div>
+
+      {bots === null && <Loading label="Loading bots…" compact />}
+
+      {bots && bots.length === 0 && (
+        <p className="py-2 text-xs text-[var(--muted)]">You don&apos;t have any bots.</p>
+      )}
+
+      {bots && bots.length > 0 && (
+        <ul className="flex flex-col gap-2">
+          {bots.map((bot) => (
+            <li key={bot.Id} className="rounded-md border border-[var(--line)] px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">{bot.Name || "Unnamed bot"}</div>
+                  {bot.Description && (
+                    <div className="truncate text-xs text-[var(--muted)]">{bot.Description}</div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--line)] px-2.5 py-1 text-xs text-[var(--text)] hover:bg-[var(--line)] disabled:opacity-50"
+                  disabled={busyId === bot.Id}
+                  onClick={() => reveal(bot.Id)}
+                >
+                  {busyId === bot.Id && <Spinner className="h-3 w-3" />}
+                  {tokens[bot.Id] ? "Refresh" : "Reveal token"}
+                </button>
+              </div>
+              {tokens[bot.Id] && (
+                <div className="mt-2 flex items-center gap-2">
+                  <code className="min-w-0 flex-1 truncate rounded bg-[var(--surface-2,var(--line))] px-2 py-1 font-mono text-[11px]">
+                    {tokens[bot.Id]}
+                  </code>
+                  <button
+                    type="button"
+                    className="shrink-0 rounded-md border border-[var(--line)] px-2 py-1 text-xs text-[var(--muted)] hover:bg-[var(--line)] hover:text-[var(--text)]"
+                    title="Copy token"
+                    onClick={() => navigator.clipboard?.writeText(tokens[bot.Id])}
+                  >
+                    <i className="fa-regular fa-copy" />
+                  </button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {error && <p className="mt-2 text-xs text-[var(--danger,#d9686c)]">{error}</p>}
     </div>
   );
 }
