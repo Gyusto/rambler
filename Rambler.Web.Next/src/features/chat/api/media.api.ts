@@ -1,13 +1,19 @@
 import { getToken } from "@/features/chat/state/chat-store";
 import { env } from "@/lib/config/env";
 
+export interface UploadResult {
+  url: string;
+  name: string;
+  contentType: string;
+}
+
 /**
- * Image upload against the .NET MediaController (stores in MinIO, returns a
- * public URL). Uses raw fetch so the browser sets the multipart boundary; the
- * chat token is passed so guests can upload too.
+ * File upload against the .NET MediaController (stores in MinIO, returns a
+ * public URL + name). Uses raw fetch so the browser sets the multipart
+ * boundary; the chat token is passed so guests can upload too.
  */
 export const mediaApi = {
-  upload: async (file: File): Promise<string> => {
+  upload: async (file: File): Promise<UploadResult> => {
     const form = new FormData();
     form.append("file", file);
 
@@ -21,7 +27,7 @@ export const mediaApi = {
       throw new Error(text || `Upload failed (${res.status})`);
     }
 
-    const data = (await res.json()) as { Url: string };
-    return data.Url;
+    const data = (await res.json()) as { Url: string; Name: string; ContentType: string };
+    return { url: data.Url, name: data.Name, contentType: data.ContentType };
   },
 };

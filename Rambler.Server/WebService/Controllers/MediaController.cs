@@ -15,8 +15,16 @@ namespace Rambler.Server.WebService.Controllers
     [Authorize]
     public class MediaController : ControllerBase
     {
-        private static readonly string[] AllowedTypes = { "image/png", "image/jpeg", "image/gif", "image/webp" };
-        private const long MaxBytes = 5 * 1024 * 1024;
+        private static readonly System.Collections.Generic.HashSet<string> AllowedExtensions =
+            new System.Collections.Generic.HashSet<string>(System.StringComparer.OrdinalIgnoreCase)
+            {
+                // images
+                ".png", ".jpg", ".jpeg", ".gif", ".webp",
+                // documents
+                ".pdf", ".txt", ".md", ".csv", ".json",
+                ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".zip",
+            };
+        private const long MaxBytes = 15 * 1024 * 1024;
         private static bool bucketReady;
 
         private readonly MediaOptions opts;
@@ -53,19 +61,22 @@ namespace Rambler.Server.WebService.Controllers
 
             if (file.Length > MaxBytes)
             {
-                return BadRequest("That image is too large (max 5MB).");
+                return BadRequest("That file is too large (max 15MB).");
             }
 
-            if (Array.IndexOf(AllowedTypes, file.ContentType) < 0)
+            var name = SafeName(Path.GetFileName(file.FileName));
+            var ext = Path.GetExtension(name);
+            if (!AllowedExtensions.Contains(ext))
             {
-                return BadRequest("Only PNG, JPEG, GIF and WebP images are allowed.");
+                return BadRequest("That file type isn't allowed.");
             }
 
             var client = CreateClient();
             await EnsureBucket(client);
 
-            var ext = Path.GetExtension(file.FileName);
-            var key = Guid.NewGuid().ToString("N") + ext;
+            // {guid}/{filename} keeps uploads unique but preserves the original name
+            // in the URL so the client can display it (esp. for documents).
+            var key = Guid.NewGuid().ToString("N") + "/" + name;
 
             using (var stream = file.OpenReadStream())
             {
@@ -74,12 +85,34 @@ namespace Rambler.Server.WebService.Controllers
                     BucketName = opts.Bucket,
                     Key = key,
                     InputStream = stream,
-                    ContentType = file.ContentType,
+                    ContentType = string.IsNullOrEmpty(file.ContentType) ? "application/octet-stream" : file.ContentType,
                     AutoCloseStream = true,
                 });
             }
 
-            return Ok(new { Url = $"{opts.PublicUrl.TrimEnd('/')}/{key}" });
+            return Ok(new
+            {
+                Url = $"{opts.PublicUrl.TrimEnd('/')}/{key}",
+                Name = name,
+                ContentType = file.ContentType,
+            });
+        }
+
+        /// <summary>Strip path + unsafe characters from an uploaded filename.</summary>
+        private static string SafeName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return "file";
+            }
+
+            var cleaned = System.Text.RegularExpressions.Regex.Replace(name, "[^A-Za-z0-9._-]", "_").Trim('_');
+            if (string.IsNullOrEmpty(cleaned))
+            {
+                cleaned = "file";
+            }
+
+            return cleaned.Length > 80 ? cleaned.Substring(cleaned.Length - 80) : cleaned;
         }
 
         private IAmazonS3 CreateClient()

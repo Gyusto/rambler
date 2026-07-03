@@ -5,6 +5,7 @@ import { avatarColor, avatarGradient, initials } from "@/lib/avatar";
 import { useChatStore } from "@/features/chat/state/chat-store";
 import { roleBadge, roleMark } from "@/features/chat/roles";
 import { EmojiPicker } from "@/features/chat/components/lobby/emoji-picker";
+import { FileCard, MessageImage } from "@/features/chat/components/lobby/message-media";
 import type { ChatMessage, Reaction } from "@/features/chat/types";
 import type { RoomUser } from "@/types/protocol";
 
@@ -38,6 +39,13 @@ function time(ts: number) {
   } catch {
     return "";
   }
+}
+
+/** Render a message body: image thumbnail, file card, or formatted text. */
+function renderBody(m: ChatMessage) {
+  if (m.kind === "image") return <MessageImage src={m.text} />;
+  if (m.kind === "file") return <FileCard src={m.text} />;
+  return renderText(m.text);
 }
 
 /** Render text with `inline code` spans. */
@@ -158,19 +166,7 @@ function MessageRow({
           </div>
         )}
 
-        <div className="text">
-          {m.kind === "image" ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={m.text}
-              alt=""
-              loading="lazy"
-              className="mt-1 max-w-[320px] rounded-[var(--r-sm)] border border-[var(--line)]"
-            />
-          ) : (
-            renderText(m.text)
-          )}
-        </div>
+        <div className="text">{renderBody(m)}</div>
 
         {groups.length > 0 && (
           <div className="mt-1.5 flex flex-wrap gap-1">

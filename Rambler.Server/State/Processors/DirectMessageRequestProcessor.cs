@@ -91,7 +91,9 @@
                 }
             }
 
-            var type = req.Data.Type == MessageTypes.IMAGE ? MessageTypes.IMAGE : MessageTypes.MESSAGE;
+            var type = req.Data.Type == MessageTypes.IMAGE || req.Data.Type == MessageTypes.FILE
+                ? req.Data.Type
+                : MessageTypes.MESSAGE;
 
             var resp = new Response<DirectMessageResponse>()
             {

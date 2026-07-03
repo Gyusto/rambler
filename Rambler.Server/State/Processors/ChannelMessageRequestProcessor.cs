@@ -78,8 +78,10 @@
                 }
             }
 
-            // Only "image" is honoured as a client-set type; everything else is a plain message.
-            var type = req.Data.Type == MessageTypes.IMAGE ? MessageTypes.IMAGE : MessageTypes.MESSAGE;
+            // Only media types are honoured as a client-set type; everything else is a plain message.
+            var type = req.Data.Type == MessageTypes.IMAGE || req.Data.Type == MessageTypes.FILE
+                ? req.Data.Type
+                : MessageTypes.MESSAGE;
 
             var resp = new Response<ChannelMessageResponse>()
             {

@@ -70,8 +70,8 @@ interface ChatState {
   setActive: (id: string) => void;
   closeConversation: (id: string) => void;
   sendMessage: (text: string, replyToId?: number) => void;
-  /** send an uploaded image (its public URL) as an image message. */
-  sendImage: (url: string) => void;
+  /** send an uploaded file (its public URL) as an image or file message. */
+  sendMedia: (url: string, kind: "image" | "file") => void;
   /** toggle an emoji reaction on a post. */
   sendReaction: (postId: number, emoji: string) => void;
   /** set/clear the message the composer is replying to. */
@@ -197,15 +197,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  sendImage: (url) => {
+  sendMedia: (url, kind) => {
     const { activeId, conversations, replyTarget } = get();
     const conv = activeId ? conversations[activeId] : undefined;
     if (!conv || !url) return;
     const replyToId = replyTarget?.postId ?? null;
     if (conv.kind === "room") {
-      socket?.send(MessageKey.CHMSG, { ChannelId: conv.id, Message: url, Type: "image", ReplyToId: replyToId });
+      socket?.send(MessageKey.CHMSG, { ChannelId: conv.id, Message: url, Type: kind, ReplyToId: replyToId });
     } else {
-      socket?.send(MessageKey.DM, { UserId: conv.id, Message: url, Type: "image", ReplyToId: replyToId });
+      socket?.send(MessageKey.DM, { UserId: conv.id, Message: url, Type: kind, ReplyToId: replyToId });
     }
     set({ replyTarget: undefined });
   },

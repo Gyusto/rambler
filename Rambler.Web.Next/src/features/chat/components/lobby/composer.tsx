@@ -15,7 +15,7 @@ export function Composer() {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const sendMessage = useChatStore((s) => s.sendMessage);
-  const sendImage = useChatStore((s) => s.sendImage);
+  const sendMedia = useChatStore((s) => s.sendMedia);
   const sendTyping = useChatStore((s) => s.sendTyping);
   const active = useChatStore((s) => (s.activeId ? s.conversations[s.activeId] : undefined));
   const replyTarget = useChatStore((s) => s.replyTarget);
@@ -87,19 +87,24 @@ export function Composer() {
   }
 
   async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // allow re-picking the same file
-    if (!file || !active) return;
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = ""; // allow re-picking the same file(s)
+    if (files.length === 0 || !active) return;
     setUploading(true);
     setUploadError(null);
-    try {
-      const url = await mediaApi.upload(file);
-      sendImage(url);
-    } catch {
-      setUploadError("Couldn't upload that image.");
-    } finally {
-      setUploading(false);
+    let failed = 0;
+    // upload sequentially so the messages arrive in the order they were picked
+    for (const file of files) {
+      try {
+        const { url, contentType } = await mediaApi.upload(file);
+        const kind = (contentType || file.type).startsWith("image/") ? "image" : "file";
+        sendMedia(url, kind);
+      } catch {
+        failed += 1;
+      }
     }
+    if (failed > 0) setUploadError(`Couldn't upload ${failed} file${failed > 1 ? "s" : ""}.`);
+    setUploading(false);
   }
 
   return (
@@ -153,17 +158,18 @@ export function Composer() {
         </div>
         <button
           className="tool flex-none"
-          title="Attach image"
-          aria-label="Attach image"
+          title="Attach files"
+          aria-label="Attach files"
           disabled={!active || uploading}
           onClick={() => fileRef.current?.click()}
         >
-          {uploading ? <Spinner className="h-4 w-4" /> : <i className="fa-solid fa-image" />}
+          {uploading ? <Spinner className="h-4 w-4" /> : <i className="fa-solid fa-paperclip" />}
         </button>
         <input
           ref={fileRef}
           type="file"
-          accept="image/png,image/jpeg,image/gif,image/webp"
+          multiple
+          accept="image/*,.pdf,.txt,.md,.csv,.json,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip"
           className="hidden"
           onChange={onPickFile}
         />
