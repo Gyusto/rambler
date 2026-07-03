@@ -97,6 +97,12 @@ export function LandingHero() {
           <span className="text-lg font-semibold text-white">Rambler</span>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            href="/blog"
+            className="hidden rounded-full px-3 py-1.5 text-sm text-white/70 transition-colors hover:bg-white/10 hover:text-white sm:inline-flex"
+          >
+            Blog
+          </Link>
           <a
             href={GITHUB_URL}
             target="_blank"
@@ -238,8 +244,12 @@ export function LandingHero() {
           </Link>
           , and any delicious cookies we decide to stuff your browser with. 🍪
         </p>
-        <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-white/50">
+        <p className="mt-3 flex flex-wrap items-center justify-center gap-1.5 text-center text-xs text-white/50">
           Rambler · open source chat ·
+          <Link href="/blog" className="text-white/80 hover:text-white">
+            Blog
+          </Link>
+          ·
           <a
             href={GITHUB_URL}
             target="_blank"
