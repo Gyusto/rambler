@@ -7,11 +7,20 @@ import { TypingIndicator } from "@/features/chat/components/lobby/typing-indicat
 import { Spinner } from "@/components/ui/spinner";
 import { mediaApi } from "@/features/chat/api/media.api";
 
+interface PendingFile {
+  id: string;
+  file: File;
+  isImage: boolean;
+  /** object URL for image previews (revoked after send/remove) */
+  preview?: string;
+}
+
 export function Composer() {
   const [text, setText] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingFile[]>([]);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const sendMessage = useChatStore((s) => s.sendMessage);
@@ -57,10 +66,12 @@ export function Composer() {
   // stop typing when switching conversations or unmounting
   useEffect(() => stopTyping, [active?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const canSend = !!active && text.trim().length > 0;
+  const hasPending = pending.length > 0;
+  const canSend = !!active && !uploading && (text.trim().length > 0 || hasPending);
 
   let placeholder = "Connecting…";
-  if (active?.kind === "dm") placeholder = `Message ${active.name}…`;
+  if (hasPending) placeholder = "Add a caption…";
+  else if (active?.kind === "dm") placeholder = `Message ${active.name}…`;
   else if (active) placeholder = "Just ramble away…";
 
   function autosize() {
@@ -70,8 +81,61 @@ export function Composer() {
     ta.style.height = `${Math.min(ta.scrollHeight, 140)}px`;
   }
 
-  function submit() {
-    if (!canSend) return;
+  function addFiles(files: File[]) {
+    setUploadError(null);
+    setPending((prev) => [
+      ...prev,
+      ...files.map((file) => {
+        const isImage = file.type.startsWith("image/");
+        return {
+          id: `${file.name}-${file.size}-${prev.length}-${file.lastModified}`,
+          file,
+          isImage,
+          preview: isImage ? URL.createObjectURL(file) : undefined,
+        };
+      }),
+    ]);
+  }
+
+  function removePending(id: string) {
+    setPending((prev) => {
+      const item = prev.find((p) => p.id === id);
+      if (item?.preview) URL.revokeObjectURL(item.preview);
+      return prev.filter((p) => p.id !== id);
+    });
+  }
+
+  async function submit() {
+    if (!canSend || uploading) return;
+
+    // staged files: upload each and send; the caption (if any) rides the first one.
+    if (hasPending) {
+      const items = pending;
+      const caption = text.trim();
+      setPending([]);
+      setText("");
+      requestAnimationFrame(autosize);
+      stopTyping();
+      setUploading(true);
+      setUploadError(null);
+      let failed = 0;
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        try {
+          const { url, contentType } = await mediaApi.upload(it.file);
+          const kind = (contentType || it.file.type).startsWith("image/") ? "image" : "file";
+          sendMedia(url, kind, i === 0 ? caption : undefined);
+        } catch {
+          failed += 1;
+        }
+        if (it.preview) URL.revokeObjectURL(it.preview);
+      }
+      setUploading(false);
+      if (failed > 0) setUploadError(`Couldn't upload ${failed} file${failed > 1 ? "s" : ""}.`);
+      taRef.current?.focus();
+      return;
+    }
+
     stopTyping();
     sendMessage(text, replyTarget?.postId);
     setReplyTarget(undefined);
@@ -86,25 +150,10 @@ export function Composer() {
     taRef.current?.focus();
   }
 
-  async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     e.target.value = ""; // allow re-picking the same file(s)
-    if (files.length === 0 || !active) return;
-    setUploading(true);
-    setUploadError(null);
-    let failed = 0;
-    // upload sequentially so the messages arrive in the order they were picked
-    for (const file of files) {
-      try {
-        const { url, contentType } = await mediaApi.upload(file);
-        const kind = (contentType || file.type).startsWith("image/") ? "image" : "file";
-        sendMedia(url, kind);
-      } catch {
-        failed += 1;
-      }
-    }
-    if (failed > 0) setUploadError(`Couldn't upload ${failed} file${failed > 1 ? "s" : ""}.`);
-    setUploading(false);
+    if (files.length > 0 && active) addFiles(files);
   }
 
   return (
@@ -141,6 +190,42 @@ export function Composer() {
       {uploadError && (
         <div className="mb-1.5 px-1 text-xs" style={{ color: "var(--danger, #d9686c)" }}>
           {uploadError}
+        </div>
+      )}
+      {hasPending && (
+        <div
+          className="mb-1.5 flex flex-wrap gap-2 rounded-lg border p-2"
+          style={{ background: "var(--surface-2, var(--raised))", borderColor: "var(--line)" }}
+        >
+          {pending.map((p) => (
+            <div
+              key={p.id}
+              className="group relative flex items-center gap-2 overflow-hidden rounded-md border"
+              style={{ borderColor: "var(--line)", background: "var(--surface)" }}
+            >
+              {p.isImage && p.preview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={p.preview} alt={p.file.name} className="h-14 w-14 object-cover" />
+              ) : (
+                <span className="flex h-14 items-center gap-2 px-3">
+                  <i className="fa-solid fa-file text-[16px]" style={{ color: "var(--glow-b)" }} />
+                  <span className="max-w-[140px] truncate text-xs" style={{ color: "var(--text)" }}>
+                    {p.file.name}
+                  </span>
+                </span>
+              )}
+              <button
+                type="button"
+                title="Remove"
+                aria-label={`Remove ${p.file.name}`}
+                onClick={() => removePending(p.id)}
+                className="absolute right-0.5 top-0.5 grid h-5 w-5 place-items-center rounded-full text-white opacity-0 transition-opacity group-hover:opacity-100"
+                style={{ background: "rgba(0,0,0,.55)" }}
+              >
+                <i className="fa-solid fa-xmark text-[11px]" />
+              </button>
+            </div>
+          ))}
         </div>
       )}
       <div className="field">

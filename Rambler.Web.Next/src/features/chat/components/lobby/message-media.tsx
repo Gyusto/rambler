@@ -3,6 +3,25 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
+/**
+ * A media message's text is either a bare URL or a JSON `{ url, caption }`
+ * payload (when the sender added a caption). Parse both, and tolerate a plain
+ * URL that happens to look nothing like JSON.
+ */
+export function parseMedia(raw: string): { url: string; caption?: string } {
+  if (raw && raw.startsWith("{")) {
+    try {
+      const obj = JSON.parse(raw);
+      if (obj && typeof obj.url === "string") {
+        return { url: obj.url, caption: typeof obj.caption === "string" ? obj.caption : undefined };
+      }
+    } catch {
+      /* fall through to bare url */
+    }
+  }
+  return { url: raw };
+}
+
 /** Extract and decode the display filename (last path segment) from a media URL. */
 function fileName(src: string): string {
   try {

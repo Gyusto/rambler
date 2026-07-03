@@ -13,3 +13,5 @@ Rambler.Test/obj/*
 Rambler.Contracts/bin/*
 Rambler.Server/bin/*
 Rambler.Test/bin/*
+
+/images/Screenshot*

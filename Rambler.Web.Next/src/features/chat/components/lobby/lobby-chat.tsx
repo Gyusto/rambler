@@ -12,6 +12,7 @@ import { useChatStore } from "@/features/chat/state/chat-store";
 
 export function LobbyChat() {
   const [membersOpen, setMembersOpen] = useState(false);
+  const [railOpen, setRailOpen] = useState(false);
   const error = useChatStore((s) => s.error);
   const clearError = useChatStore((s) => s.clearError);
   const hasActiveConversation = useChatStore(
@@ -46,12 +47,15 @@ export function LobbyChat() {
       <AppHeader />
 
       <div className="lobby-grid">
-        <RoomsRail />
+        <RoomsRail open={railOpen} onNavigate={() => setRailOpen(false)} />
 
         <section className="lobby-chat">
           {hasActiveConversation ? (
             <>
-              <TopBar onToggleMembers={() => setMembersOpen((v) => !v)} />
+              <TopBar
+                onToggleMembers={() => setMembersOpen((v) => !v)}
+                onToggleRail={() => setRailOpen((v) => !v)}
+              />
               <MessageStream />
               <Composer />
             </>
@@ -64,9 +68,12 @@ export function LobbyChat() {
       </div>
 
       <button
-        className={`scrim${membersOpen ? " show" : ""}`}
-        aria-label="Close members"
-        onClick={() => setMembersOpen(false)}
+        className={`scrim${membersOpen || railOpen ? " show" : ""}`}
+        aria-label="Close panels"
+        onClick={() => {
+          setMembersOpen(false);
+          setRailOpen(false);
+        }}
       />
     </div>
   );

@@ -12,7 +12,10 @@ const dotClass: Record<ConnectionStatus, string> = {
   [ConnectionStatus.Disconnected]: "off",
 };
 
-export function TopBar({ onToggleMembers }: Readonly<{ onToggleMembers: () => void }>) {
+export function TopBar({
+  onToggleMembers,
+  onToggleRail,
+}: Readonly<{ onToggleMembers: () => void; onToggleRail: () => void }>) {
   const active = useChatStore((s) => (s.activeId ? s.conversations[s.activeId] : undefined));
   const status = useChatStore((s) => s.status);
   const closeConversation = useChatStore((s) => s.closeConversation);
@@ -28,6 +31,14 @@ export function TopBar({ onToggleMembers }: Readonly<{ onToggleMembers: () => vo
 
   return (
     <header className="topbar">
+      <button
+        className="icon-btn rooms-toggle"
+        title="Show chats"
+        aria-label="Show chats"
+        onClick={onToggleRail}
+      >
+        <i className="fa-solid fa-bars" />
+      </button>
       <div className="brand">
         <span className="topbar-glyph" aria-hidden="true">
           <i className={`fa-solid ${isDm ? "fa-at" : "fa-hashtag"}`} />

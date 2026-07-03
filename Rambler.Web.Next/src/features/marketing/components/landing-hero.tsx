@@ -8,6 +8,7 @@ import { Reveal } from "@/components/ui/reveal";
 import { cn } from "@/lib/utils";
 import { THEMES } from "@/features/theme/themes";
 import { ArchitectureSection } from "@/features/marketing/components/architecture-section";
+import { ScreenshotGallery } from "@/features/marketing/components/screenshot-gallery";
 import { ImageLightbox } from "@/features/marketing/components/image-lightbox";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 
@@ -175,6 +176,9 @@ export function LandingHero() {
           />
         </Reveal>
       </section>
+
+      {/* Screenshot gallery */}
+      <ScreenshotGallery />
 
       {/* Features - "What's inside" */}
       <section className="mx-auto w-full max-w-6xl px-6 py-24">

@@ -94,7 +94,13 @@ function ConvRow({
   );
 }
 
-export function RoomsRail() {
+export function RoomsRail({
+  open = false,
+  onNavigate,
+}: {
+  open?: boolean;
+  onNavigate?: () => void;
+}) {
   const [browserOpen, setBrowserOpen] = useState(false);
 
   const order = useChatStore((s) => s.order);
@@ -164,8 +170,13 @@ export function RoomsRail() {
     };
   }, [activeId, conversations, userId, hydrateHistory, markHistoryLoaded]);
 
+  const select = (id: string) => {
+    setActive(id);
+    onNavigate?.(); // close the drawer on mobile after picking a chat
+  };
+
   return (
-    <aside className="rooms-rail flex min-h-0 min-w-0 flex-col border-r border-[var(--line)] bg-[color-mix(in_srgb,var(--surface)_55%,transparent)]">
+    <aside className={`rooms-rail flex min-h-0 min-w-0 flex-col border-r border-[var(--line)] bg-[color-mix(in_srgb,var(--surface)_55%,transparent)]${open ? " open" : ""}`}>
       <div className="flex items-center gap-2 border-b border-[var(--line)] px-3.5 py-3.5">
         <h2 className="m-0 flex-1 text-[16px] font-bold tracking-[-.01em] text-[var(--text)]">
           Chats
@@ -188,7 +199,7 @@ export function RoomsRail() {
             key={conv.id}
             conv={conv}
             active={activeId === conv.id}
-            onSelect={() => setActive(conv.id)}
+            onSelect={() => select(conv.id)}
             onClose={() => closeConversation(conv.id)}
           />
         ))}
@@ -200,7 +211,7 @@ export function RoomsRail() {
             key={conv.id}
             conv={conv}
             active={activeId === conv.id}
-            onSelect={() => setActive(conv.id)}
+            onSelect={() => select(conv.id)}
             onClose={() => closeConversation(conv.id)}
           />
         ))}
