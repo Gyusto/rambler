@@ -70,10 +70,14 @@ const features: Feature[] = [
 export function LandingHero() {
   const session = useAuth((s) => s.session);
   const [online, setOnline] = useState<number | null>(null);
+  const [members, setMembers] = useState<number | null>(null);
 
   useEffect(() => {
     let alive = true;
-    const load = () => statusApi.activeUsers().then((n) => alive && setOnline(n)).catch(() => {});
+    const load = () => {
+      statusApi.activeUsers().then((n) => alive && setOnline(n)).catch(() => {});
+      statusApi.totalUsers().then((n) => alive && setMembers(n)).catch(() => {});
+    };
     load();
     const t = setInterval(load, 20000);
     return () => {
@@ -129,6 +133,9 @@ export function LandingHero() {
             {online != null && online > 0
               ? `${online} ${online === 1 ? "person" : "people"} online now`
               : "A fresh Next.js interface"}
+            {members != null && members > 0 && (
+              <span className="text-white/40">· {members.toLocaleString()} members</span>
+            )}
           </span>
 
           <h1 className="text-5xl font-bold leading-[1.05] tracking-tight text-white sm:text-6xl">

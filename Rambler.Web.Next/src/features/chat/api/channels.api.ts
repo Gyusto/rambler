@@ -160,4 +160,14 @@ export const channelsApi = {
       )}&userId=${encodeURIComponent(userId)}`,
       {},
     ),
+
+  /**
+   * Resolve a user's most recent nick from their id (pulled from the
+   * connection log). GET /channel/getnickfromuserid?userId=. Returns a bare
+   * JSON string; requires the login cookie.
+   */
+  getNickFromUserId: (userId: string) =>
+    http.get<string>(
+      `/channel/getnickfromuserid?userId=${encodeURIComponent(userId)}`,
+    ),
 };
