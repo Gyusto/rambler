@@ -19,6 +19,7 @@ export const MessageKey = {
   CHWARN: "CHWARN",
   CHTYPING: "CHTYPING",
   DMTYPING: "DMTYPING",
+  REACT: "REACT",
   ERROR: "ERROR",
   DM: "DM",
 } as const;
@@ -28,10 +29,19 @@ export type MessageKeyType = (typeof MessageKey)[keyof typeof MessageKey];
 /** Inbound envelope wrapping every server response. */
 export interface ResponseEnvelope<T = unknown> {
   Type: MessageKeyType | string;
+  /** persisted post id (for CHMSG/DM), used as the reaction/reply target. */
+  Id?: number;
   /** socket id, user id, or channel id depending on the message. */
   Subscription: string;
   Timestamp: number;
   Data: T;
+}
+
+/** One emoji reaction on a post. */
+export interface ReactionDto {
+  Emoji: string;
+  UserId: string;
+  Nick: string;
 }
 
 // --- Inbound payloads (Data) ---------------------------------------------
@@ -59,6 +69,19 @@ export interface ChannelMessageData {
   Type: string;
   Nick: string;
   Message: string;
+  ReplyToId?: number | null;
+  ReplyToNick?: string | null;
+  ReplyToText?: string | null;
+  Reactions?: ReactionDto[] | null;
+}
+
+/** REACT: a reaction was toggled on a post. */
+export interface ReactionData {
+  PostId: number;
+  Emoji: string;
+  UserId: string;
+  Nick: string;
+  Added: boolean;
 }
 
 export interface ChannelTypingData {
@@ -105,6 +128,10 @@ export interface DirectMessageData {
   Message: string;
   EchoUser?: string;
   Nick: string;
+  ReplyToId?: number | null;
+  ReplyToNick?: string | null;
+  ReplyToText?: string | null;
+  Reactions?: ReactionDto[] | null;
 }
 
 /** CHUSERUP - a single user's details changed within a channel. */

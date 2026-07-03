@@ -7,14 +7,39 @@ export enum ConnectionStatus {
   Waiting = "waiting",
 }
 
+export interface Reaction {
+  emoji: string;
+  userId: string;
+  nick: string;
+}
+
+export interface ReplyRef {
+  id: number;
+  nick: string;
+  text: string;
+}
+
+/** The message the composer is currently replying to (null when not replying). */
+export interface ReplyTarget {
+  postId: number;
+  nick: string;
+  text: string;
+}
+
 export interface ChatMessage {
   id: string;
+  /** persisted server post id (reaction/reply target); absent for optimistic/system rows */
+  postId?: number;
   userId: string;
   nick: string;
   text: string;
   self: boolean;
   ts: number;
   system?: boolean;
+  /** message type from the server (e.g. "MSG", or "image" for uploads) */
+  kind?: string;
+  reactions?: Reaction[];
+  replyTo?: ReplyRef;
 }
 
 export interface CurrentChannel {

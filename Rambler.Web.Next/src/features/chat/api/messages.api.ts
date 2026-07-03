@@ -1,9 +1,18 @@
 import { http } from "@/lib/api/http";
+import type { ReactionDto } from "@/types/protocol";
 
 /**
  * Message-history REST calls against the .NET ChatController.
  * Paths/verbs are copied verbatim from the legacy RamblerApiService.ts.
  */
+
+/** reply/reaction fields the history endpoints hydrate onto each post. */
+interface PostExtras {
+  ReplyToId?: number | null;
+  ReplyToNick?: string | null;
+  ReplyToText?: string | null;
+  Reactions?: ReactionDto[] | null;
+}
 
 /** Mirrors Rambler.Contracts.Responses.Response<T> - the wrapper envelope. */
 export interface Response<T> {
@@ -16,7 +25,7 @@ export interface Response<T> {
 }
 
 /** Mirrors Rambler.Contracts.Responses.ChannelMessageResponse (KEY = "CHMSG"). */
-export interface ChannelMessageResponse {
+export interface ChannelMessageResponse extends PostExtras {
   UserId: string;
   Type: string;
   Nick: string;
@@ -24,7 +33,7 @@ export interface ChannelMessageResponse {
 }
 
 /** Mirrors Rambler.Contracts.Responses.DirectMessageResponse (KEY = "DM"). */
-export interface DirectMessageResponse {
+export interface DirectMessageResponse extends PostExtras {
   UserId: string;
   Type: string;
   Message: string;

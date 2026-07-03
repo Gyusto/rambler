@@ -5,6 +5,7 @@
     using Microsoft.EntityFrameworkCore;
     using Models;
     using System;
+    using System.Linq;
     using System.Threading.Tasks;
 
     public class ApplicationDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>
@@ -30,6 +31,8 @@
         public DbSet<Bot> Bots { get; set; }
 
         public DbSet<BotChannel> BotChannels { get; set; }
+
+        public DbSet<PostReaction> PostReactions { get; set; }
 
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
             : base(options)
@@ -98,7 +101,8 @@
             DateTime timestamp,
             string message,
             string nick,
-            string type)
+            string type,
+            long? replyToId = null)
         {
             var sresp = new ChannelPost()
             {
@@ -108,12 +112,75 @@
                 Subscription = subscription,
                 Message = message,
                 Type = type,
+                ReplyToId = replyToId,
             };
 
             ChannelPosts.Add(sresp);
             await SaveChangesAsync();
 
             return sresp.Id;
+        }
+
+        /// <summary>Result of a reaction toggle - tells the caller where to fan out.</summary>
+        public class ReactionToggle
+        {
+            public bool Added { get; set; }
+            public Guid Subscription { get; set; }
+            public Guid Originator { get; set; }
+        }
+
+        /// <summary>Add the reaction if the caller hasn't placed it, otherwise remove it.</summary>
+        public async Task<ReactionToggle> ToggleReaction(long postId, Guid userId, string nick, string emoji)
+        {
+            var post = await ChannelPosts
+                .Where(p => p.Id == postId)
+                .Select(p => new { p.Subscription, p.Originator })
+                .FirstOrDefaultAsync();
+
+            if (post == null)
+            {
+                return null;
+            }
+
+            var existing = await PostReactions
+                .FirstOrDefaultAsync(r => r.PostId == postId && r.UserId == userId && r.Emoji == emoji);
+
+            bool added;
+            if (existing != null)
+            {
+                PostReactions.Remove(existing);
+                added = false;
+            }
+            else
+            {
+                PostReactions.Add(new PostReaction
+                {
+                    PostId = postId,
+                    UserId = userId,
+                    Nick = nick,
+                    Emoji = emoji,
+                    CreatedOn = DateTime.UtcNow,
+                });
+                added = true;
+            }
+
+            await SaveChangesAsync();
+
+            return new ReactionToggle
+            {
+                Added = added,
+                Subscription = post.Subscription,
+                Originator = post.Originator,
+            };
+        }
+
+        /// <summary>All reactions for a set of posts (for history hydration).</summary>
+        public Task<System.Collections.Generic.List<PostReaction>> GetReactionsForPosts(
+            System.Collections.Generic.IEnumerable<long> postIds)
+        {
+            return PostReactions
+                .Where(r => postIds.Contains(r.PostId))
+                .ToListAsync();
         }
     }
 }

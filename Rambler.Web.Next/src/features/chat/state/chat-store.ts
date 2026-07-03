@@ -15,6 +15,8 @@ import {
   type ChannelUsersData,
   type DirectMessageData,
   type JoinData,
+  type ReactionData,
+  type ReactionDto,
   type ResponseEnvelope,
   type RoomUser,
 } from "@/types/protocol";
@@ -22,7 +24,26 @@ import {
   ConnectionStatus,
   type ChatMessage,
   type Conversation,
+  type Reaction,
+  type ReplyRef,
+  type ReplyTarget,
 } from "@/features/chat/types";
+
+/** Map a message payload's reaction list to store shape. */
+export function mapReactions(d: { Reactions?: ReactionDto[] | null }): Reaction[] | undefined {
+  if (!d.Reactions?.length) return undefined;
+  return d.Reactions.map((r) => ({ emoji: r.Emoji, userId: r.UserId, nick: r.Nick }));
+}
+
+/** Map a message payload's reply fields to a ReplyRef. */
+export function mapReply(d: {
+  ReplyToId?: number | null;
+  ReplyToNick?: string | null;
+  ReplyToText?: string | null;
+}): ReplyRef | undefined {
+  if (d.ReplyToId == null) return undefined;
+  return { id: d.ReplyToId, nick: d.ReplyToNick ?? "?", text: d.ReplyToText ?? "" };
+}
 
 let msgSeq = 0;
 const nextId = () => `${Date.now()}-${msgSeq++}`;
@@ -38,6 +59,8 @@ interface ChatState {
   /** display order in the rail. */
   order: string[];
   activeId?: string;
+  /** message the composer is replying to (undefined when not replying). */
+  replyTarget?: ReplyTarget;
 
   connect: (token: string, nick: string, initialRoom?: string) => void;
   disconnect: () => void;
@@ -46,7 +69,13 @@ interface ChatState {
   openDm: (userId: string, nick: string) => void;
   setActive: (id: string) => void;
   closeConversation: (id: string) => void;
-  sendMessage: (text: string) => void;
+  sendMessage: (text: string, replyToId?: number) => void;
+  /** send an uploaded image (its public URL) as an image message. */
+  sendImage: (url: string) => void;
+  /** toggle an emoji reaction on a post. */
+  sendReaction: (postId: number, emoji: string) => void;
+  /** set/clear the message the composer is replying to. */
+  setReplyTarget: (target?: ReplyTarget) => void;
   /** broadcast a typing start/stop; targets `convId` if given, else the active conversation. */
   sendTyping: (isTyping: boolean, convId?: string) => void;
   /** prepend loaded history to a conversation (idempotent-ish: only if empty). */
@@ -135,7 +164,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const { conversations } = get();
     const conv = conversations[id];
     if (!conv) return;
-    set({ activeId: id, conversations: { ...conversations, [id]: { ...conv, unread: 0 } } });
+    set({
+      activeId: id,
+      replyTarget: undefined,
+      conversations: { ...conversations, [id]: { ...conv, unread: 0 } },
+    });
   },
 
   closeConversation: (id) => {
@@ -152,17 +185,36 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  sendMessage: (text) => {
+  sendMessage: (text, replyToId) => {
     const { activeId, conversations } = get();
     const conv = activeId ? conversations[activeId] : undefined;
     const trimmed = text.trim();
     if (!conv || !trimmed) return;
     if (conv.kind === "room") {
-      socket?.send(MessageKey.CHMSG, { ChannelId: conv.id, Message: trimmed });
+      socket?.send(MessageKey.CHMSG, { ChannelId: conv.id, Message: trimmed, ReplyToId: replyToId ?? null });
     } else {
-      socket?.send(MessageKey.DM, { UserId: conv.id, Message: trimmed });
+      socket?.send(MessageKey.DM, { UserId: conv.id, Message: trimmed, ReplyToId: replyToId ?? null });
     }
   },
+
+  sendImage: (url) => {
+    const { activeId, conversations, replyTarget } = get();
+    const conv = activeId ? conversations[activeId] : undefined;
+    if (!conv || !url) return;
+    const replyToId = replyTarget?.postId ?? null;
+    if (conv.kind === "room") {
+      socket?.send(MessageKey.CHMSG, { ChannelId: conv.id, Message: url, Type: "image", ReplyToId: replyToId });
+    } else {
+      socket?.send(MessageKey.DM, { UserId: conv.id, Message: url, Type: "image", ReplyToId: replyToId });
+    }
+    set({ replyTarget: undefined });
+  },
+
+  sendReaction: (postId, emoji) => {
+    socket?.send(MessageKey.REACT, { PostId: postId, Emoji: emoji });
+  },
+
+  setReplyTarget: (target) => set({ replyTarget: target }),
 
   sendTyping: (isTyping, convId) => {
     const { activeId, conversations } = get();
@@ -217,6 +269,34 @@ function addMessage(get: Getter, set: Setter, convId: string, message: ChatMessa
       },
     },
   });
+}
+
+/** Apply a reaction toggle to whichever conversation holds the post. Idempotent. */
+function applyReaction(get: Getter, set: Setter, d: ReactionData) {
+  const { conversations } = get();
+  const next: Record<string, Conversation> = {};
+  let changed = false;
+  for (const [cid, conv] of Object.entries(conversations)) {
+    const idx = conv.messages.findIndex((m) => m.postId === d.PostId);
+    if (idx === -1) {
+      next[cid] = conv;
+      continue;
+    }
+    const target = conv.messages[idx];
+    const existing = target.reactions ?? [];
+    const already = existing.some((r) => r.emoji === d.Emoji && r.userId === d.UserId);
+    let reactions: Reaction[];
+    if (d.Added) {
+      reactions = already ? existing : [...existing, { emoji: d.Emoji, userId: d.UserId, nick: d.Nick }];
+    } else {
+      reactions = existing.filter((r) => !(r.emoji === d.Emoji && r.userId === d.UserId));
+    }
+    const messages = [...conv.messages];
+    messages[idx] = { ...target, reactions };
+    next[cid] = { ...conv, messages };
+    changed = true;
+  }
+  if (changed) set({ conversations: next });
 }
 
 function systemMessage(convId: string, text: string, get: Getter, set: Setter) {
@@ -304,11 +384,15 @@ function handle(msg: ResponseEnvelope, set: Setter, get: Getter) {
       const sender = conversations[roomId]?.users.find((u) => u.Id === d.UserId);
       addMessage(get, set, roomId, {
         id: nextId(),
+        postId: msg.Id,
         userId: d.UserId,
         nick: d.Nick ?? sender?.Nick ?? "?",
         text: d.Message ?? "",
         self: d.UserId === userId,
         ts: msg.Timestamp,
+        kind: d.Type,
+        reactions: mapReactions(d),
+        replyTo: mapReply(d),
       });
       break;
     }
@@ -322,6 +406,10 @@ function handle(msg: ResponseEnvelope, set: Setter, get: Getter) {
         else delete typing[d.UserId];
         return { ...c, typing };
       });
+      break;
+    }
+    case MessageKey.REACT: {
+      applyReaction(get, set, msg.Data as ReactionData);
       break;
     }
     case MessageKey.DMTYPING: {
@@ -372,11 +460,15 @@ function handle(msg: ResponseEnvelope, set: Setter, get: Getter) {
       }
       addMessage(get, set, counterpart, {
         id: nextId(),
+        postId: msg.Id,
         userId: d.UserId,
         nick: senderNick,
         text: d.Message ?? "",
         self,
         ts: msg.Timestamp,
+        kind: d.Type,
+        reactions: mapReactions(d),
+        replyTo: mapReply(d),
       });
       break;
     }

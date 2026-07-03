@@ -211,6 +211,7 @@
             services.Configure<Options.TokenOptions>(Configuration.GetSection("Token"));
             services.Configure<Options.EmailOptions>(Configuration.GetSection("Email"));
             services.Configure<Options.DnsBlackListOptions>(Configuration.GetSection("DnsBlackList"));
+            services.Configure<Options.MediaOptions>(Configuration.GetSection("Media"));
 
             var facebook = Configuration.GetSection("Facebook").Get<FacebookAuthOptions>();
             var google = Configuration.GetSection("Google").Get<GoogleAuthOptions>();

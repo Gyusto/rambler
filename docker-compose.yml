@@ -16,6 +16,19 @@ services:
     # ports:
     #   - "5432:5432"
 
+  # S3-compatible object storage for uploaded images.
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
+    volumes:
+      - rambler-minio:/data
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+
   server:
     build:
       context: .
@@ -23,6 +36,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      minio:
+        condition: service_started
     # all values come from the .env file (see .env.example)
     environment:
       ConnectionStrings__DefaultConnection: "${CONNECTION_STRING}"
@@ -36,6 +51,11 @@ services:
       Site__EnableCaptcha: "${SITE_ENABLE_CAPTCHA}"
       Site__AutoConfirmEmail: "${SITE_AUTOCONFIRMEMAIL}"
       Site__LobbyOwner: "${SITE_LOBBY_OWNER}"
+      Media__Endpoint: "${MEDIA_ENDPOINT}"
+      Media__PublicUrl: "${MEDIA_PUBLIC_URL}"
+      Media__AccessKey: "${MINIO_ROOT_USER}"
+      Media__SecretKey: "${MINIO_ROOT_PASSWORD}"
+      Media__Bucket: "${MEDIA_BUCKET}"
       Logging__LogLevel__Default: "${LOG_LEVEL}"
     ports:
       - "${APP_PORT}:5000"
@@ -60,3 +80,4 @@ services:
 
 volumes:
   rambler-db:
+  rambler-minio:

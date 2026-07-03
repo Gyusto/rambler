@@ -34,5 +34,10 @@
         /// Serialized data of the message
         /// </summary>
         public string Message { get; set; }
+
+        /// <summary>
+        /// If this post is a reply, the id of the post it replies to.
+        /// </summary>
+        public long? ReplyToId { get; set; }
     }
 }

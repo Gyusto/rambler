@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getToken, useChatStore } from "@/features/chat/state/chat-store";
+import { getToken, mapReactions, mapReply, useChatStore } from "@/features/chat/state/chat-store";
 import { messagesApi } from "@/features/chat/api/messages.api";
 import type { ChatMessage, Conversation } from "@/features/chat/types";
 import { RoomBrowser } from "@/features/chat/components/lobby/room-browser";
@@ -128,21 +128,29 @@ export function RoomsRail() {
                 .reverse()
                 .map((e, i) => ({
                   id: `${e.Timestamp}-${i}`,
+                  postId: e.Id,
                   userId: e.Data.UserId,
                   nick: e.Data.Nick ?? conv.name ?? "?",
                   text: e.Data.Message ?? "",
                   self: e.Data.UserId === userId,
                   ts: e.Timestamp,
+                  kind: e.Data.Type,
+                  reactions: mapReactions(e.Data),
+                  replyTo: mapReply(e.Data),
                 }))
             : [...(await messagesApi.getSubscriptionMessages(getToken(), convId, 0))]
                 .reverse()
                 .map((e, i) => ({
                   id: `${e.Timestamp}-${i}`,
+                  postId: e.Id,
                   userId: e.Data.UserId,
                   nick: e.Data.Nick ?? "?",
                   text: e.Data.Message ?? "",
                   self: e.Data.UserId === userId,
                   ts: e.Timestamp,
+                  kind: e.Data.Type,
+                  reactions: mapReactions(e.Data),
+                  replyTo: mapReply(e.Data),
                 }));
         if (cancelled) return;
         if (mapped.length > 0) hydrateHistory(convId, mapped);

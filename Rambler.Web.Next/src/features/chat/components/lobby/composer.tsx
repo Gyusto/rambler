@@ -4,14 +4,22 @@ import { useEffect, useRef, useState } from "react";
 import { useChatStore } from "@/features/chat/state/chat-store";
 import { EmojiPicker } from "@/features/chat/components/lobby/emoji-picker";
 import { TypingIndicator } from "@/features/chat/components/lobby/typing-indicator";
+import { Spinner } from "@/components/ui/spinner";
+import { mediaApi } from "@/features/chat/api/media.api";
 
 export function Composer() {
   const [text, setText] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const sendMessage = useChatStore((s) => s.sendMessage);
+  const sendImage = useChatStore((s) => s.sendImage);
   const sendTyping = useChatStore((s) => s.sendTyping);
   const active = useChatStore((s) => (s.activeId ? s.conversations[s.activeId] : undefined));
+  const replyTarget = useChatStore((s) => s.replyTarget);
+  const setReplyTarget = useChatStore((s) => s.setReplyTarget);
 
   // typing: "start" on first keystroke, re-send while typing, "stop" on idle/send/switch
   const typingRef = useRef(false);
@@ -65,7 +73,8 @@ export function Composer() {
   function submit() {
     if (!canSend) return;
     stopTyping();
-    sendMessage(text);
+    sendMessage(text, replyTarget?.postId);
+    setReplyTarget(undefined);
     setText("");
     requestAnimationFrame(autosize);
     taRef.current?.focus();
@@ -77,9 +86,58 @@ export function Composer() {
     taRef.current?.focus();
   }
 
+  async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (!file || !active) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const url = await mediaApi.upload(file);
+      sendImage(url);
+    } catch {
+      setUploadError("Couldn't upload that image.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return (
     <footer className="composer">
       <TypingIndicator />
+      {replyTarget && (
+        <div
+          className="mb-1.5 flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm"
+          style={{
+            background: "var(--surface-2, var(--raised))",
+            borderColor: "var(--line)",
+          }}
+        >
+          <i className="fa-solid fa-reply flex-none" style={{ color: "var(--muted)" }} />
+          <span className="min-w-0 flex-1 truncate">
+            <span style={{ color: "var(--muted)" }}>Replying to </span>
+            <span className="font-medium" style={{ color: "var(--text)" }}>
+              {replyTarget.nick}
+            </span>
+            <span className="ml-2 truncate" style={{ color: "var(--muted)" }}>
+              {replyTarget.text}
+            </span>
+          </span>
+          <button
+            className="tool flex-none"
+            title="Cancel reply"
+            aria-label="Cancel reply"
+            onClick={() => setReplyTarget(undefined)}
+          >
+            <i className="fa-solid fa-xmark" />
+          </button>
+        </div>
+      )}
+      {uploadError && (
+        <div className="mb-1.5 px-1 text-xs" style={{ color: "var(--danger, #d9686c)" }}>
+          {uploadError}
+        </div>
+      )}
       <div className="field">
         <div className="relative flex-none">
           <button
@@ -93,6 +151,22 @@ export function Composer() {
           </button>
           {pickerOpen && <EmojiPicker onPick={insertEmoji} onClose={() => setPickerOpen(false)} />}
         </div>
+        <button
+          className="tool flex-none"
+          title="Attach image"
+          aria-label="Attach image"
+          disabled={!active || uploading}
+          onClick={() => fileRef.current?.click()}
+        >
+          {uploading ? <Spinner className="h-4 w-4" /> : <i className="fa-solid fa-image" />}
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          className="hidden"
+          onChange={onPickFile}
+        />
         <textarea
           ref={taRef}
           rows={1}
@@ -110,6 +184,9 @@ export function Composer() {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               submit();
+            } else if (e.key === "Escape" && replyTarget) {
+              e.preventDefault();
+              setReplyTarget(undefined);
             }
           }}
         />

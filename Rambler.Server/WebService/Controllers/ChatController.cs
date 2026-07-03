@@ -76,6 +76,31 @@
             return null;
         }
 
+        /// <summary>Batch-load reactions (grouped by post) and reply targets for a page of posts.</summary>
+        private async Task<(Dictionary<long, List<ReactionDto>> reactions, Dictionary<long, ChannelPost> replies)> LoadPostExtras(List<ChannelPost> posts)
+        {
+            var ids = posts.Select(p => p.Id).ToList();
+            var reactionRows = await db.GetReactionsForPosts(ids);
+            var reactions = reactionRows
+                .GroupBy(r => r.PostId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(r => new ReactionDto { Emoji = r.Emoji, UserId = r.UserId, Nick = r.Nick }).ToList());
+
+            var replyIds = posts.Where(p => p.ReplyToId.HasValue).Select(p => p.ReplyToId.Value).Distinct().ToList();
+            var replies = replyIds.Count == 0
+                ? new Dictionary<long, ChannelPost>()
+                : (await db.ChannelPosts.Where(p => replyIds.Contains(p.Id)).ToListAsync()).ToDictionary(p => p.Id);
+
+            return (reactions, replies);
+        }
+
+        private static string ReplyNick(ChannelPost p, Dictionary<long, ChannelPost> replies)
+            => p.ReplyToId.HasValue && replies.TryGetValue(p.ReplyToId.Value, out var r) ? r.Nick : null;
+
+        private static string ReplyText(ChannelPost p, Dictionary<long, ChannelPost> replies)
+            => p.ReplyToId.HasValue && replies.TryGetValue(p.ReplyToId.Value, out var r) ? r.Message : null;
+
 
         [HttpPost]
         [AllowAnonymous]
@@ -99,6 +124,8 @@
                 .Take(MAX_MESSAGES)
                 .ToListAsync();
 
+            var (reactions, replies) = await LoadPostExtras(posts);
+
             var results = posts.Select(p => new Response<ChannelMessageResponse>()
             {
                 Id = p.Id,
@@ -111,6 +138,10 @@
                     UserId = p.Originator,
                     Nick = p.Nick,
                     Type = p.Type,
+                    ReplyToId = p.ReplyToId,
+                    ReplyToNick = ReplyNick(p, replies),
+                    ReplyToText = ReplyText(p, replies),
+                    Reactions = reactions.TryGetValue(p.Id, out var rl) ? rl : null,
                 }
             }).ToList();
 
@@ -136,6 +167,8 @@
                 .Take(MAX_MESSAGES)
                 .ToListAsync();
 
+            var (reactions, replies) = await LoadPostExtras(posts);
+
             // client doesn't need the echo user in this case since both users are always present
             // (unlike normal echos which are f'ing weird)
             var results = posts.Select(p => new Response<DirectMessageResponse>()
@@ -150,6 +183,10 @@
                     UserId = p.Originator,
                     Nick = p.Nick,
                     Type = p.Type,
+                    ReplyToId = p.ReplyToId,
+                    ReplyToNick = ReplyNick(p, replies),
+                    ReplyToText = ReplyText(p, replies),
+                    Reactions = reactions.TryGetValue(p.Id, out var rl) ? rl : null,
                 }
             }).ToList();
 

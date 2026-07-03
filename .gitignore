@@ -9,3 +9,7 @@ Rambler.Test/obj/*
 # stray mockup drops
 /images/Jul *
 /images/demo.png
+
+Rambler.Contracts/bin/*
+Rambler.Server/bin/*
+Rambler.Test/bin/*

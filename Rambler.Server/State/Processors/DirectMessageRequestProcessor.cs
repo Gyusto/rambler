@@ -77,6 +77,22 @@
             var timestamp = DateTime.UtcNow;
             var timestampms = ((DateTimeOffset)timestamp).ToUnixTimeMilliseconds();
 
+            string replyNick = null, replyText = null;
+            if (req.Data.ReplyToId.HasValue)
+            {
+                var rp = await db.ChannelPosts
+                    .Where(p => p.Id == req.Data.ReplyToId.Value)
+                    .Select(p => new { p.Nick, p.Message })
+                    .FirstOrDefaultAsync();
+                if (rp != null)
+                {
+                    replyNick = rp.Nick;
+                    replyText = rp.Message;
+                }
+            }
+
+            var type = req.Data.Type == MessageTypes.IMAGE ? MessageTypes.IMAGE : MessageTypes.MESSAGE;
+
             var resp = new Response<DirectMessageResponse>()
             {
                 Timestamp = timestampms,
@@ -86,7 +102,10 @@
                     UserId = req.UserId,
                     Nick = nick,  // may be first contact - always include the nick
                     Message = req.Data.Message,
-                    Type = MessageTypes.MESSAGE,
+                    Type = type,
+                    ReplyToId = req.Data.ReplyToId,
+                    ReplyToNick = replyNick,
+                    ReplyToText = replyText,
                 }
             };
 
@@ -98,7 +117,8 @@
                 timestamp,
                 resp.Data.Message,
                 nick,
-                resp.Data.Type
+                resp.Data.Type,
+                req.Data.ReplyToId
                 );
 
             resp.Id = id;
@@ -115,6 +135,10 @@
                     UserId = req.UserId,
                     EchoUser = req.Data.UserId,
                     Message = req.Data.Message,
+                    Type = type,
+                    ReplyToId = req.Data.ReplyToId,
+                    ReplyToNick = replyNick,
+                    ReplyToText = replyText,
                 }
             };
 
