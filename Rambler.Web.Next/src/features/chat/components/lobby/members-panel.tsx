@@ -2,19 +2,12 @@
 
 import { avatarColor, avatarGradient, initials } from "@/lib/avatar";
 import { useChatStore } from "@/features/chat/state/chat-store";
-import { roleBadge } from "@/features/chat/roles";
+import { roleBadge, roleMark as marks } from "@/features/chat/roles";
 import { channelsApi } from "@/features/chat/api/channels.api";
 import { settingsApi } from "@/features/chat/api/settings.api";
 import { BanLevel, type ChannelBanDto } from "@/features/chat/api/channels.types";
 import type { RoomUser } from "@/types/protocol";
 import { UserMenu } from "./user-menu";
-
-const marks: Record<string, string> = {
-  admin: "fa-crown",
-  owner: "fa-shield-halved",
-  mod: "fa-star",
-  guest: "fa-user",
-};
 
 /** Build a ChannelBanDto from what we know about the target user. */
 function buildBanDto(channelId: string, user: RoomUser, level: BanLevel): ChannelBanDto {

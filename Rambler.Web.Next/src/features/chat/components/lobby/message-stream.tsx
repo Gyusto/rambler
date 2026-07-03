@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useRef } from "react";
 import { avatarColor, avatarGradient, initials } from "@/lib/avatar";
 import { useChatStore } from "@/features/chat/state/chat-store";
-import { roleBadge } from "@/features/chat/roles";
+import { roleBadge, roleMark } from "@/features/chat/roles";
 import type { ChatMessage } from "@/features/chat/types";
 import type { RoomUser } from "@/types/protocol";
 
@@ -111,7 +111,12 @@ function MessageRow({
             <span className="who" style={{ color: avatarColor(m.nick) }}>
               {m.nick}
             </span>
-            {badge && <span className="badge">{badge}</span>}
+            {badge && (
+              <span className="badge">
+                <i className={`fa-solid ${roleMark[badge]} mr-1 text-[0.85em]`} />
+                {badge}
+              </span>
+            )}
             <span className="stamp">{time(m.ts)}</span>
           </div>
         )}

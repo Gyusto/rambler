@@ -10,3 +10,11 @@ export function roleBadge(u?: Pick<RoomUser, "ModLevel" | "IsGuest">): string | 
   if (u.IsGuest) return "guest";
   return null;
 }
+
+/** Font Awesome mark for each role. The room owner gets the crown. */
+export const roleMark: Record<string, string> = {
+  admin: "fa-shield-halved",
+  owner: "fa-crown",
+  mod: "fa-star",
+  guest: "fa-user",
+};

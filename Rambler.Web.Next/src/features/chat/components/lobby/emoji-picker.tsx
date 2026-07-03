@@ -75,7 +75,7 @@ export function EmojiPicker({
         ))}
       </div>
 
-      <div className="grid max-h-[240px] grid-cols-8 gap-0.5 overflow-y-auto p-2">
+      <div className="grid h-[240px] grid-cols-8 content-start gap-0.5 overflow-y-auto p-2">
         {emojis.length === 0 && (
           <div className="col-span-8 py-8 text-center text-[13px] text-[var(--muted)]">
             No recent emoji yet.
