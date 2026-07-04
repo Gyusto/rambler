@@ -82,7 +82,7 @@ export function MessageImage({ src }: Readonly<{ src: string }>) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Open image"
-        className="relative mt-1 block cursor-zoom-in overflow-hidden rounded-[var(--r-sm)] border border-[var(--line)] bg-transparent p-0"
+        className="relative mt-1 block w-fit min-h-[80px] min-w-[120px] max-w-[min(320px,100%)] cursor-zoom-in overflow-hidden rounded-[var(--r-sm)] border border-[var(--line)] bg-transparent p-0"
       >
         {!loaded && (
           <div className="absolute inset-0 animate-pulse bg-[var(--raised)]" aria-hidden />
@@ -94,7 +94,7 @@ export function MessageImage({ src }: Readonly<{ src: string }>) {
           loading="lazy"
           onLoad={() => setLoaded(true)}
           onError={() => setFailed(true)}
-          className={`block max-h-[180px] max-w-[260px] object-cover transition-[filter,opacity,transform] duration-300 ${
+          className={`block h-auto max-h-[220px] max-w-full transition-[filter,opacity,transform] duration-300 ${
             loaded ? "blur-0 scale-100 opacity-100" : "scale-105 opacity-0 blur-md"
           }`}
         />
