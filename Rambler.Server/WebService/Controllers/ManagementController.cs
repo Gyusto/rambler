@@ -313,6 +313,18 @@
                 return BadRequest("Cannot moderate users with same authorization level.");
             }
 
+            // Persist the change so the admin badge survives a reconnect, then
+            // broadcast the new level to the live roster.
+            targetUser.Level = up
+                ? ApplicationUser.UserLevel.Admin
+                : ApplicationUser.UserLevel.Normal;
+
+            var update = await userManager.UpdateAsync(targetUser);
+            if (!update.Succeeded)
+            {
+                return StatusCode(500, "Couldn't update the user's level.");
+            }
+
             await PublishAdminToggle(targetUser.Id, up, (ModerationLevel)targetUser.Level);
 
             return Ok();
