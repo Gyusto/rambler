@@ -38,6 +38,9 @@
 
         public const int SEND_RETRIES = 3;
 
+        // Shared across all sends; newing an HttpClient per call leaks sockets (TIME_WAIT).
+        private static readonly HttpClient httpClient = new HttpClient();
+
         private readonly List<SubscribedBot> Bots = new List<SubscribedBot>();
         private readonly TaskQueue queue = new TaskQueue();
         private readonly ILogger log;
@@ -92,34 +95,32 @@
             if (bot.IsIgnored()) return; // previous task fired the ignore
 
             var data = JsonConvert.SerializeObject(response);
-            var content = new StringContent(data);
 
             for (var x = 0; x < SEND_RETRIES; x++)
             {
-                using (var client = new HttpClient())
+                try
                 {
-                    try
+                    // Fresh content per attempt: content is consumed once it's sent.
+                    var content = new StringContent(data);
+                    var res = await httpClient.PostAsync(bot.Bot.Name, content);
+                    if (res.IsSuccessStatusCode)
                     {
-                        var res = await client.PostAsync(bot.Bot.Name, content);
-                        if (res.IsSuccessStatusCode)
-                        {
-                            log.LogDebug("Sent bot {name} message.", bot.Bot.Name);
-                            return;  // all done
-                        }
-                        else
-                        {
-                            log.LogDebug("Failed to send bot {name} message.  Status {status}, {statusText}.",
-                                bot.Bot.Name,
-                                res.StatusCode,
-                                res.ReasonPhrase);
+                        log.LogDebug("Sent bot {name} message.", bot.Bot.Name);
+                        return;  // all done
+                    }
+                    else
+                    {
+                        log.LogDebug("Failed to send bot {name} message.  Status {status}, {statusText}.",
+                            bot.Bot.Name,
+                            res.StatusCode,
+                            res.ReasonPhrase);
 
-                        }
-                        return;
                     }
-                    catch (Exception ex)
-                    {
-                        log.LogError(0, ex, "Error sending to bot {name}", bot.Bot.Name);
-                    }
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    log.LogError(0, ex, "Error sending to bot {name}", bot.Bot.Name);
                 }
 
                 if (x < SEND_RETRIES)
