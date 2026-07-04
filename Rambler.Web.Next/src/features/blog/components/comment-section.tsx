@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { commentsApi, type BlogComment } from "@/features/blog/api/comments.api";
 
-/** How often to re-fetch the thread so it stays roughly live. */
+/** How often to re-fetch the first page so the thread stays roughly live. */
 const POLL_MS = 20_000;
 
 /** Format an ISO timestamp as a short relative time ("just now", "3h ago"). */
@@ -37,91 +37,178 @@ function initials(nick: string): string {
   return trimmed.slice(0, 2).toUpperCase();
 }
 
+/**
+ * Upsert `incoming` into `list` by Id. Existing entries update in place
+ * (keeping their position); new entries are appended. Ordering is applied
+ * separately by the caller.
+ */
+function upsertById(list: BlogComment[], incoming: BlogComment[]): BlogComment[] {
+  if (incoming.length === 0) return list;
+  const byId = new Map(list.map((c) => [c.Id, c]));
+  for (const c of incoming) byId.set(c.Id, c);
+  return [...byId.values()];
+}
+
+/** Roots are shown newest-first; break ties by Id so order stays stable. */
+function sortRootsDesc(list: BlogComment[]): BlogComment[] {
+  return [...list].sort((a, b) => {
+    const diff = new Date(b.CreatedOn).getTime() - new Date(a.CreatedOn).getTime();
+    return diff !== 0 ? diff : b.Id - a.Id;
+  });
+}
+
 /** Comment section for a blog article. Fetches at runtime (client island). */
 export function CommentSection({ slug }: { slug: string }) {
   const router = useRouter();
   const session = useAuth((s) => s.session);
   const canComment = Boolean(session); // registered OR guest may comment now
 
-  const [comments, setComments] = useState<BlogComment[]>([]);
+  // Roots are kept newest-first; replies are a flat list grouped per parent.
+  const [roots, setRoots] = useState<BlogComment[]>([]);
+  const [replies, setReplies] = useState<BlogComment[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+
   const [commentsDisabled, setCommentsDisabled] = useState(false);
   const [canModerate, setCanModerate] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  const applyResponse = useCallback(
+  // Thread-level flags + count. Applied on every response (initial/poll/page).
+  const applyMeta = useCallback(
     (data: Awaited<ReturnType<typeof commentsApi.listComments>>) => {
-      setComments(data.Comments);
       setCommentsDisabled(data.CommentsDisabled);
       setCanModerate(data.CanModerate);
       setHidden(data.Hidden);
+      setTotalCount(data.TotalCount);
     },
     [],
   );
 
-  // Initial load + poll. Re-fetches every POLL_MS; the server is authoritative.
+  // Upsert a batch of comments into local state. New roots slot in by
+  // CreatedOn desc; edited bodies update in place; loaded older roots that
+  // aren't in the batch are preserved (upsert never removes).
+  const mergeComments = useCallback((incoming: BlogComment[]) => {
+    const incomingRoots = incoming.filter((c) => c.ParentId === null);
+    const incomingReplies = incoming.filter((c) => c.ParentId !== null);
+    if (incomingRoots.length > 0) {
+      setRoots((prev) => sortRootsDesc(upsertById(prev, incomingRoots)));
+    }
+    if (incomingReplies.length > 0) {
+      setReplies((prev) => upsertById(prev, incomingReplies));
+    }
+  }, []);
+
+  // Initial load + poll. The poll re-fetches only the FIRST page and merges,
+  // so already-loaded older pages are never wiped and the cursor is untouched.
   useEffect(() => {
     let active = true;
     setLoading(true);
     setLoadError(false);
+    setRoots([]);
+    setReplies([]);
+    setNextCursor(null);
 
-    const load = (initial: boolean) =>
+    commentsApi
+      .listComments(slug)
+      .then((data) => {
+        if (!active) return;
+        applyMeta(data);
+        mergeComments(data.Comments);
+        setNextCursor(data.NextCursor);
+      })
+      .catch(() => {
+        if (active) setLoadError(true);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    const timer = setInterval(() => {
       commentsApi
         .listComments(slug)
         .then((data) => {
-          if (active) {
-            applyResponse(data);
-            if (initial) setLoadError(false);
-          }
+          if (!active) return;
+          applyMeta(data);
+          mergeComments(data.Comments); // merge only — leave nextCursor alone
         })
         .catch(() => {
-          if (active && initial) setLoadError(true);
-        })
-        .finally(() => {
-          if (active && initial) setLoading(false);
+          /* transient poll failure — keep what we have */
         });
-
-    void load(true);
-    const timer = setInterval(() => void load(false), POLL_MS);
+    }, POLL_MS);
 
     return () => {
       active = false;
       clearInterval(timer);
     };
-  }, [slug, applyResponse]);
+  }, [slug, applyMeta, mergeComments]);
 
-  const { roots, repliesByParent } = useMemo(() => {
-    const roots: BlogComment[] = [];
-    const repliesByParent = new Map<number, BlogComment[]>();
-    for (const c of comments) {
-      if (c.ParentId === null) {
-        roots.push(c);
-      } else {
-        const bucket = repliesByParent.get(c.ParentId) ?? [];
-        bucket.push(c);
-        repliesByParent.set(c.ParentId, bucket);
-      }
+  const repliesByParent = useMemo(() => {
+    const map = new Map<number, BlogComment[]>();
+    for (const c of replies) {
+      if (c.ParentId === null) continue;
+      const bucket = map.get(c.ParentId) ?? [];
+      bucket.push(c);
+      map.set(c.ParentId, bucket);
     }
-    return { roots, repliesByParent };
-  }, [comments]);
+    // Replies read oldest-first under each root.
+    for (const bucket of map.values()) {
+      bucket.sort((a, b) => {
+        const diff =
+          new Date(a.CreatedOn).getTime() - new Date(b.CreatedOn).getTime();
+        return diff !== 0 ? diff : a.Id - b.Id;
+      });
+    }
+    return map;
+  }, [replies]);
 
-  const addComment = (comment: BlogComment) =>
-    setComments((prev) => [...prev, comment]);
+  const loadMore = async () => {
+    if (loadingMore || !nextCursor) return;
+    setLoadingMore(true);
+    try {
+      const data = await commentsApi.listComments(slug, nextCursor);
+      applyMeta(data);
+      mergeComments(data.Comments);
+      setNextCursor(data.NextCursor);
+    } catch {
+      /* leave the button in place so the reader can retry */
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
-  const removeComment = (id: number) =>
-    setComments((prev) =>
-      prev.filter((c) => c.Id !== id && c.ParentId !== id),
-    );
+  // A posted comment/reply and an edited comment both flow through the merge:
+  // a new root sorts to the front, a reply drops under its parent, an edit
+  // updates in place.
+  const upsertComment = useCallback(
+    (comment: BlogComment) => mergeComments([comment]),
+    [mergeComments],
+  );
+
+  const handlePosted = useCallback(
+    (comment: BlogComment) => {
+      upsertComment(comment);
+      if (comment.ParentId === null) setTotalCount((n) => n + 1);
+    },
+    [upsertComment],
+  );
 
   const handleDelete = async (id: number) => {
     // Optimistically remove; if it's a root, its replies drop with it.
-    const snapshot = comments;
-    removeComment(id);
+    const rootSnapshot = roots;
+    const replySnapshot = replies;
+    const wasRoot = roots.some((c) => c.Id === id);
+    setRoots((prev) => prev.filter((c) => c.Id !== id));
+    setReplies((prev) => prev.filter((c) => c.Id !== id && c.ParentId !== id));
+    if (wasRoot) setTotalCount((n) => Math.max(0, n - 1));
     try {
       await commentsApi.deleteComment(id);
     } catch {
-      setComments(snapshot); // restore on failure
+      setRoots(rootSnapshot); // restore on failure
+      setReplies(replySnapshot);
+      if (wasRoot) setTotalCount((n) => n + 1);
     }
   };
 
@@ -153,9 +240,9 @@ export function CommentSection({ slug }: { slug: string }) {
       <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
         <i className="fa-regular fa-comments text-rambler-turquoise" />
         Comments
-        {!loading && comments.length > 0 && (
+        {!loading && totalCount > 0 && (
           <span className="text-sm font-normal text-white/40">
-            {comments.length}
+            {totalCount}
           </span>
         )}
       </h2>
@@ -199,7 +286,7 @@ export function CommentSection({ slug }: { slug: string }) {
       {/* Top-level composer, a closed notice, or a sign-in prompt. */}
       {showComposer ? (
         <div className="mt-6">
-          <Composer slug={slug} parentId={null} onPosted={addComment} />
+          <Composer slug={slug} parentId={null} onPosted={handlePosted} />
         </div>
       ) : !canComment ? (
         <div className="mt-6 flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/60">
@@ -237,19 +324,45 @@ export function CommentSection({ slug }: { slug: string }) {
             No comments yet — start the conversation.
           </p>
         ) : (
-          <ul className="space-y-6">
-            {roots.map((comment) => (
-              <CommentItem
-                key={comment.Id}
-                slug={slug}
-                comment={comment}
-                replies={repliesByParent.get(comment.Id) ?? []}
-                canComment={canComment}
-                onPosted={addComment}
-                onDelete={handleDelete}
-              />
-            ))}
-          </ul>
+          <>
+            <ul className="space-y-6">
+              {roots.map((comment) => (
+                <CommentItem
+                  key={comment.Id}
+                  slug={slug}
+                  comment={comment}
+                  replies={repliesByParent.get(comment.Id) ?? []}
+                  canComment={canComment}
+                  onPosted={handlePosted}
+                  onDelete={handleDelete}
+                  onEdited={upsertComment}
+                />
+              ))}
+            </ul>
+
+            {nextCursor && (
+              <div className="mt-8 flex justify-center">
+                <button
+                  type="button"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-xs font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50"
+                >
+                  {loadingMore ? (
+                    <>
+                      <i className="fa-solid fa-circle-notch animate-spin" />
+                      Loading…
+                    </>
+                  ) : (
+                    <>
+                      <i className="fa-solid fa-arrow-down" />
+                      Load older comments
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </section>
@@ -264,6 +377,7 @@ function CommentItem({
   canComment,
   onPosted,
   onDelete,
+  onEdited,
 }: {
   slug: string;
   comment: BlogComment;
@@ -271,12 +385,13 @@ function CommentItem({
   canComment: boolean;
   onPosted: (comment: BlogComment) => void;
   onDelete: (id: number) => void;
+  onEdited: (comment: BlogComment) => void;
 }) {
   const [replying, setReplying] = useState(false);
 
   return (
     <li>
-      <CommentBody comment={comment} onDelete={onDelete} />
+      <CommentBody comment={comment} onDelete={onDelete} onEdited={onEdited} />
 
       <div className="mt-2 pl-[3.25rem]">
         {canComment && (
@@ -309,7 +424,11 @@ function CommentItem({
         <ul className="mt-4 space-y-4 border-l border-white/10 pl-4 sm:pl-6">
           {replies.map((reply) => (
             <li key={reply.Id}>
-              <CommentBody comment={reply} onDelete={onDelete} />
+              <CommentBody
+                comment={reply}
+                onDelete={onDelete}
+                onEdited={onEdited}
+              />
             </li>
           ))}
         </ul>
@@ -318,15 +437,51 @@ function CommentItem({
   );
 }
 
-/** Renders the avatar, nick, time, body and (if allowed) a delete control. */
+/**
+ * Renders the avatar, nick, time and body, plus (if allowed) edit and delete
+ * controls. Editing swaps the body for an inline textarea.
+ */
 function CommentBody({
   comment,
   onDelete,
+  onEdited,
 }: {
   comment: BlogComment;
   onDelete: (id: number) => void;
+  onEdited: (comment: BlogComment) => void;
 }) {
   const [confirming, setConfirming] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editBody, setEditBody] = useState(comment.Body);
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  const startEdit = () => {
+    setEditBody(comment.Body);
+    setEditError(null);
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setEditError(null);
+  };
+
+  const saveEdit = async () => {
+    const trimmed = editBody.trim();
+    if (saving || trimmed.length === 0) return;
+    setSaving(true);
+    setEditError(null);
+    try {
+      const updated = await commentsApi.editComment(comment.Id, trimmed);
+      onEdited(updated);
+      setEditing(false);
+    } catch {
+      setEditError("Couldn’t save your edit. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="group flex gap-3">
@@ -349,8 +504,16 @@ function CommentBody({
           <span className="text-xs text-white/35">
             {relativeTime(comment.CreatedOn)}
           </span>
+          {comment.EditedOn && (
+            <span
+              className="text-xs text-white/30"
+              title={`Edited ${new Date(comment.EditedOn).toLocaleString()}`}
+            >
+              · edited
+            </span>
+          )}
 
-          {comment.CanDelete && (
+          {(comment.CanEdit || comment.CanDelete) && !editing && (
             <span className="ml-auto flex items-center gap-2">
               {confirming ? (
                 <>
@@ -370,21 +533,70 @@ function CommentBody({
                   </button>
                 </>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => setConfirming(true)}
-                  aria-label="Delete comment"
-                  className="text-white/25 opacity-0 transition-opacity hover:text-rambler-self focus-visible:opacity-100 group-hover:opacity-100"
-                >
-                  <i className="fa-solid fa-trash text-xs" />
-                </button>
+                <>
+                  {comment.CanEdit && (
+                    <button
+                      type="button"
+                      onClick={startEdit}
+                      aria-label="Edit comment"
+                      className="text-white/25 opacity-0 transition-opacity hover:text-rambler-turquoise focus-visible:opacity-100 group-hover:opacity-100"
+                    >
+                      <i className="fa-solid fa-pencil text-xs" />
+                    </button>
+                  )}
+                  {comment.CanDelete && (
+                    <button
+                      type="button"
+                      onClick={() => setConfirming(true)}
+                      aria-label="Delete comment"
+                      className="text-white/25 opacity-0 transition-opacity hover:text-rambler-self focus-visible:opacity-100 group-hover:opacity-100"
+                    >
+                      <i className="fa-solid fa-trash text-xs" />
+                    </button>
+                  )}
+                </>
               )}
             </span>
           )}
         </div>
-        <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-white/70">
-          {comment.Body}
-        </p>
+
+        {editing ? (
+          <div className="mt-2">
+            <textarea
+              value={editBody}
+              onChange={(e) => setEditBody(e.target.value)}
+              rows={3}
+              className={cn(
+                "w-full resize-y rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white placeholder:text-white/30",
+                "focus:border-rambler-turquoise/40 focus:outline-none focus:ring-1 focus:ring-rambler-turquoise/40",
+              )}
+            />
+            <div className="mt-2 flex items-center gap-3">
+              <Button
+                type="button"
+                size="sm"
+                onClick={saveEdit}
+                disabled={saving || editBody.trim().length === 0}
+              >
+                {saving ? "Saving…" : "Save"}
+              </Button>
+              <button
+                type="button"
+                onClick={cancelEdit}
+                className="text-xs text-white/40 transition-colors hover:text-white/70"
+              >
+                Cancel
+              </button>
+              {editError && (
+                <span className="text-xs text-rambler-self">{editError}</span>
+              )}
+            </div>
+          </div>
+        ) : (
+          <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-white/70">
+            {comment.Body}
+          </p>
+        )}
       </div>
     </div>
   );

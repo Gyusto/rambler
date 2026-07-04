@@ -6,10 +6,10 @@ import { cn } from "@/lib/utils";
 import { Reveal } from "@/components/ui/reveal";
 import { formatPostDate, type BlogPost } from "@/features/marketing/blog-data";
 import { BlogCard } from "@/features/marketing/components/blog-card";
-import { tagAccent } from "@/features/marketing/components/blog-chrome";
+import { CATEGORIES, getCategory, tagAccent } from "@/features/marketing/blog-categories";
 import { commentsApi, type PostState } from "@/features/blog/api/comments.api";
 
-const ALL = "All" as const;
+const ALL = "all" as const;
 
 /**
  * Interactive blog index: category tabs, a featured hero and the card grid.
@@ -38,12 +38,8 @@ export function BlogBrowser({ posts }: { posts: BlogPost[] }) {
     };
   }, []);
 
-  // Distinct categories, in first-seen order.
-  const categories = useMemo(() => {
-    const seen: string[] = [];
-    for (const p of posts) if (!seen.includes(p.tag)) seen.push(p.tag);
-    return seen;
-  }, [posts]);
+  // The category matching the active tab (undefined while "All" is selected).
+  const activeCategory = active === ALL ? undefined : getCategory(active);
 
   // Hide removed posts from non-moderators.
   const visiblePosts = useMemo(
@@ -56,8 +52,8 @@ export function BlogBrowser({ posts }: { posts: BlogPost[] }) {
   );
 
   const filtered = useMemo(
-    () => visiblePosts.filter((p) => active === ALL || p.tag === active),
-    [visiblePosts, active],
+    () => visiblePosts.filter((p) => active === ALL || p.tag === activeCategory?.tag),
+    [visiblePosts, active, activeCategory],
   );
 
   // The hero is the most recent visible post (posts are newest-first).
@@ -68,25 +64,50 @@ export function BlogBrowser({ posts }: { posts: BlogPost[] }) {
 
   return (
     <>
-      {/* Category filter tabs. */}
+      {/* Category filter tabs, driven by the taxonomy. */}
       <Reveal className="mt-10">
         <div className="flex flex-wrap gap-2">
-          {[ALL, ...categories].map((cat) => (
+          <button
+            type="button"
+            onClick={() => setActive(ALL)}
+            className={cn(
+              "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
+              active === ALL
+                ? "border-white/20 bg-white/10 text-white"
+                : "border-white/10 text-white/50 hover:border-white/20 hover:text-white/80",
+            )}
+          >
+            All
+          </button>
+          {CATEGORIES.map((cat) => (
             <button
-              key={cat}
+              key={cat.slug}
               type="button"
-              onClick={() => setActive(cat)}
+              onClick={() => setActive(cat.slug)}
               className={cn(
                 "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
-                active === cat
+                active === cat.slug
                   ? "border-white/20 bg-white/10 text-white"
                   : "border-white/10 text-white/50 hover:border-white/20 hover:text-white/80",
               )}
             >
-              {cat}
+              {cat.name}
             </button>
           ))}
         </div>
+
+        {/* Blurb + link to the dedicated page for the active category. */}
+        {activeCategory && (
+          <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <p className="text-sm text-white/50">{activeCategory.description}</p>
+            <Link
+              href={`/blog/category/${activeCategory.slug}`}
+              className="inline-flex items-center gap-1 text-sm font-medium text-rambler-turquoise transition-transform hover:translate-x-0.5"
+            >
+              View all <i className="fa-solid fa-arrow-right text-[10px]" />
+            </Link>
+          </div>
+        )}
       </Reveal>
 
       {filtered.length === 0 ? (

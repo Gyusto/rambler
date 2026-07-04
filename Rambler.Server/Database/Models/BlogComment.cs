@@ -25,6 +25,9 @@ namespace Rambler.Server.Database.Models
 
         public DateTime CreatedOn { get; set; }
 
+        /// <summary>When the author last edited the body, or null if never edited.</summary>
+        public DateTime? EditedOn { get; set; }
+
         /// <summary>Denormalized guest flag so the UI can show a guest badge.</summary>
         public bool IsGuest { get; set; }
     }

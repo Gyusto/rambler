@@ -16,7 +16,9 @@ namespace Rambler.Server.WebService.Controllers
     public class BlogController : ControllerBase
     {
         private const int MaxBodyLength = 2000;
-        private const int MaxComments = 500;
+        private const int DefaultPageSize = 10;
+        private const int MinPageSize = 1;
+        private const int MaxPageSize = 50;
         private const int ModeratorLevel = (int)ApplicationUser.UserLevel.Admin;
         private static readonly TimeSpan RateLimit = TimeSpan.FromSeconds(5);
 
@@ -38,21 +40,83 @@ namespace Rambler.Server.WebService.Controllers
             this.authorizor = authorizor;
         }
 
-        /// <summary>Comments + moderation state for a blog post, oldest first. Public.</summary>
+        /// <summary>
+        /// A page of top-level comments (newest first) plus their replies, using keyset
+        /// pagination, together with the post's moderation state. Public.
+        /// </summary>
         [HttpGet("{slug}/comments")]
         [AllowAnonymous]
-        public async Task<IActionResult> GetComments(string slug, [FromQuery] string token)
+        public async Task<IActionResult> GetComments(
+            string slug,
+            [FromQuery] string token,
+            [FromQuery] string cursor,
+            [FromQuery] int? limit)
         {
             var identity = await ResolveIdentity(token);
 
-            // Newest 500 by CreatedOn, but returned in ascending order.
-            var comments = await db.BlogComments
-                .Where(c => c.PostSlug == slug)
+            var pageSize = limit ?? DefaultPageSize;
+            if (pageSize < MinPageSize)
+            {
+                pageSize = MinPageSize;
+            }
+            else if (pageSize > MaxPageSize)
+            {
+                pageSize = MaxPageSize;
+            }
+
+            // Root comments only, newest first, tie-broken by Id so the keyset is stable.
+            var rootsQuery = db.BlogComments
+                .Where(c => c.PostSlug == slug && c.ParentId == null);
+
+            if (TryDecodeCursor(cursor, out var cursorTime, out var cursorId))
+            {
+                rootsQuery = rootsQuery.Where(c =>
+                    c.CreatedOn < cursorTime ||
+                    (c.CreatedOn == cursorTime && c.Id < cursorId));
+            }
+
+            // Take one extra to know whether an older page exists.
+            var roots = await rootsQuery
                 .OrderByDescending(c => c.CreatedOn)
-                .Take(MaxComments)
+                .ThenByDescending(c => c.Id)
+                .Take(pageSize + 1)
                 .ToListAsync();
 
-            comments.Reverse();
+            var hasMore = roots.Count > pageSize;
+            if (hasMore)
+            {
+                roots.RemoveAt(roots.Count - 1);
+            }
+
+            var rootIds = roots.Select(c => c.Id).ToList();
+
+            // Replies for this page's roots, oldest first so the client can thread them.
+            var replies = await db.BlogComments
+                .Where(c => c.PostSlug == slug && c.ParentId != null && rootIds.Contains(c.ParentId.Value))
+                .OrderBy(c => c.CreatedOn)
+                .ThenBy(c => c.Id)
+                .ToListAsync();
+
+            var totalCount = await db.BlogComments
+                .CountAsync(c => c.PostSlug == slug);
+
+            // Roots stay newest-first; each root is followed by its replies (oldest first).
+            var repliesByParent = replies
+                .GroupBy(r => r.ParentId.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            var ordered = new List<BlogComment>();
+            foreach (var root in roots)
+            {
+                ordered.Add(root);
+                if (repliesByParent.TryGetValue(root.Id, out var rootReplies))
+                {
+                    ordered.AddRange(rootReplies);
+                }
+            }
+
+            var lastRoot = roots.Count > 0 ? roots[roots.Count - 1] : null;
+            var nextCursor = hasMore && lastRoot != null ? EncodeCursor(lastRoot) : null;
 
             var state = await db.BlogPostStates
                 .FirstOrDefaultAsync(s => s.Slug == slug);
@@ -62,7 +126,9 @@ namespace Rambler.Server.WebService.Controllers
                 CommentsDisabled = state?.CommentsDisabled ?? false,
                 Hidden = state?.Hidden ?? false,
                 CanModerate = identity.IsModerator,
-                Comments = comments.Select(c => ToDto(c, identity)).ToArray(),
+                TotalCount = totalCount,
+                NextCursor = nextCursor,
+                Comments = ordered.Select(c => ToDto(c, identity)).ToArray(),
             });
         }
 
@@ -132,6 +198,46 @@ namespace Rambler.Server.WebService.Controllers
             var dto = ToDto(comment, identity);
             dto.CanDelete = true;
             return Ok(dto);
+        }
+
+        /// <summary>Edit a comment's body. Only its author may edit (moderators can delete, not rewrite).</summary>
+        [HttpPut("comments/{id}")]
+        [AllowAnonymous]
+        public async Task<IActionResult> EditComment(long id, [FromQuery] string token, [FromBody] EditRequest request)
+        {
+            var identity = await ResolveIdentity(token);
+            if (identity.UserId == null)
+            {
+                return Unauthorized();
+            }
+
+            var comment = await db.BlogComments.FirstOrDefaultAsync(c => c.Id == id);
+            if (comment == null)
+            {
+                return NotFound();
+            }
+
+            if (comment.UserId != identity.UserId.Value)
+            {
+                return StatusCode(403, "You can't edit that comment.");
+            }
+
+            if (request == null || string.IsNullOrWhiteSpace(request.Body))
+            {
+                return BadRequest("Comment body is required.");
+            }
+
+            var body = request.Body.Trim();
+            if (body.Length > MaxBodyLength)
+            {
+                body = body.Substring(0, MaxBodyLength);
+            }
+
+            comment.Body = body;
+            comment.EditedOn = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+
+            return Ok(ToDto(comment, identity));
         }
 
         /// <summary>Delete a comment (its author or a moderator). Cascades to replies.</summary>
@@ -260,9 +366,58 @@ namespace Rambler.Server.WebService.Controllers
                 Nick = c.Nick,
                 Body = c.Body,
                 CreatedOn = DateTime.SpecifyKind(c.CreatedOn, DateTimeKind.Utc).ToString("o"),
+                EditedOn = c.EditedOn != null
+                    ? DateTime.SpecifyKind(c.EditedOn.Value, DateTimeKind.Utc).ToString("o")
+                    : null,
                 IsGuest = c.IsGuest,
+                CanEdit = identity.UserId != null && identity.UserId == c.UserId,
                 CanDelete = (identity.UserId != null && identity.UserId == c.UserId) || identity.IsModerator,
             };
+        }
+
+        /// <summary>Encode the keyset position of a root comment into an opaque cursor.</summary>
+        private static string EncodeCursor(BlogComment comment)
+        {
+            var raw = comment.CreatedOn.Ticks + "_" + comment.Id;
+            return Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(raw));
+        }
+
+        /// <summary>
+        /// Decode an opaque cursor back into its (CreatedOn, Id) keyset position.
+        /// Returns false (treat as first page) for a null, empty, or malformed cursor.
+        /// </summary>
+        private static bool TryDecodeCursor(string cursor, out DateTime createdOn, out long id)
+        {
+            createdOn = default;
+            id = default;
+
+            if (string.IsNullOrWhiteSpace(cursor))
+            {
+                return false;
+            }
+
+            try
+            {
+                var raw = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(cursor));
+                var parts = raw.Split('_');
+                if (parts.Length != 2 ||
+                    !long.TryParse(parts[0], out var ticks) ||
+                    !long.TryParse(parts[1], out id))
+                {
+                    return false;
+                }
+
+                createdOn = new DateTime(ticks, DateTimeKind.Unspecified);
+                return true;
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
         }
 
         /// <summary>
@@ -327,6 +482,12 @@ namespace Rambler.Server.WebService.Controllers
             public long? ParentId { get; set; }
         }
 
+        /// <summary>Incoming payload for editing a comment.</summary>
+        public class EditRequest
+        {
+            public string Body { get; set; }
+        }
+
         /// <summary>Incoming payload for a moderation change.</summary>
         public class ModerationRequest
         {
@@ -349,12 +510,18 @@ namespace Rambler.Server.WebService.Controllers
             /// <summary>ISO-8601 UTC timestamp (with a trailing Z-style offset).</summary>
             public string CreatedOn { get; set; }
 
+            /// <summary>ISO-8601 UTC timestamp of the last edit, or null if never edited.</summary>
+            public string EditedOn { get; set; }
+
             public bool IsGuest { get; set; }
+
+            /// <summary>True when the caller is the author (only the author may edit the text).</summary>
+            public bool CanEdit { get; set; }
 
             public bool CanDelete { get; set; }
         }
 
-        /// <summary>The comment list plus per-post state for a single post.</summary>
+        /// <summary>A page of comments plus per-post state for a single post.</summary>
         public class CommentsResponse
         {
             public bool CommentsDisabled { get; set; }
@@ -362,6 +529,12 @@ namespace Rambler.Server.WebService.Controllers
             public bool Hidden { get; set; }
 
             public bool CanModerate { get; set; }
+
+            /// <summary>Total comments for the post (roots + replies), across all pages.</summary>
+            public int TotalCount { get; set; }
+
+            /// <summary>Opaque cursor for the next (older) page, or null when there is none.</summary>
+            public string NextCursor { get; set; }
 
             public CommentDto[] Comments { get; set; }
         }
