@@ -33,7 +33,7 @@ export default async function BlogPostPage({ params }: Params) {
           <SiteHeader />
 
           {post ? (
-            <article className="mx-auto w-full max-w-2xl px-6 py-14 sm:py-16">
+            <article className="mx-auto w-full max-w-2xl flex-1 px-6 py-14 sm:py-16">
               <PostGate slug={post.slug}>
               <Link
                 href="/blog"
