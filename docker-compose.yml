@@ -58,6 +58,8 @@ services:
       Media__AccessKey: "${MINIO_ROOT_USER}"
       Media__SecretKey: "${MINIO_ROOT_PASSWORD}"
       Media__Bucket: "${MEDIA_BUCKET}"
+      Blog__GitHubRepo: "${BLOG_GITHUB_REPO}"
+      Blog__GitHubToken: "${BLOG_GITHUB_TOKEN}"
       Logging__LogLevel__Default: "${LOG_LEVEL}"
     ports:
       - "${APP_PORT}:5000"

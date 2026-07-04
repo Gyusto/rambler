@@ -2,25 +2,24 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+import { http } from "@/lib/api/http";
 
-const REPO = "8labs/rambler";
 const GITHUB_URL = "https://github.com/8labs/rambler";
 
-interface GhLabel {
-  name: string;
-  color: string;
+interface IssueLabel {
+  Name: string;
+  Color: string;
 }
 
-interface GhIssue {
-  number: number;
-  title: string;
-  state: "open" | "closed";
-  html_url: string;
-  comments: number;
-  created_at: string;
-  user: { login: string } | null;
-  labels: GhLabel[];
-  pull_request?: unknown;
+interface Issue {
+  Number: number;
+  Title: string;
+  State: "open" | "closed";
+  Url: string;
+  Comments: number;
+  CreatedAt: string;
+  Author: string;
+  Labels: IssueLabel[];
 }
 
 type Filter = "all" | "open" | "closed";
@@ -37,20 +36,18 @@ function timeAgo(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-/** Live list of the repo's GitHub issues (pull requests excluded). */
+/** Live list of the repo's GitHub issues (pull requests excluded server-side). */
 export function IssuesList() {
-  const [issues, setIssues] = useState<GhIssue[] | null>(null);
+  const [issues, setIssues] = useState<Issue[] | null>(null);
   const [error, setError] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
 
   useEffect(() => {
     let active = true;
-    fetch(`https://api.github.com/repos/${REPO}/issues?state=all&per_page=100&sort=updated`, {
-      headers: { Accept: "application/vnd.github+json" },
-    })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((data: GhIssue[]) => {
-        if (active) setIssues(data.filter((i) => !i.pull_request));
+    http
+      .get<Issue[]>("/Blog/issues")
+      .then((data) => {
+        if (active) setIssues(data);
       })
       .catch(() => active && setError(true));
     return () => {
@@ -59,13 +56,13 @@ export function IssuesList() {
   }, []);
 
   const counts = useMemo(() => {
-    const open = issues?.filter((i) => i.state === "open").length ?? 0;
-    const closed = issues?.filter((i) => i.state === "closed").length ?? 0;
+    const open = issues?.filter((i) => i.State === "open").length ?? 0;
+    const closed = issues?.filter((i) => i.State === "closed").length ?? 0;
     return { all: (issues?.length ?? 0), open, closed };
   }, [issues]);
 
   const visible = useMemo(
-    () => (issues ?? []).filter((i) => filter === "all" || i.state === filter),
+    () => (issues ?? []).filter((i) => filter === "all" || i.State === filter),
     [issues, filter],
   );
 
@@ -125,9 +122,9 @@ export function IssuesList() {
         ) : (
           <ul className="overflow-hidden rounded-2xl border border-white/10">
             {visible.map((issue) => (
-              <li key={issue.number} className="border-b border-white/10 last:border-b-0">
+              <li key={issue.Number} className="border-b border-white/10 last:border-b-0">
                 <a
-                  href={issue.html_url}
+                  href={issue.Url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-start gap-3 bg-[#211b33] px-4 py-3.5 transition-colors hover:bg-[#2a2340]"
@@ -135,7 +132,7 @@ export function IssuesList() {
                   <i
                     className={cn(
                       "mt-0.5 text-base",
-                      issue.state === "open"
+                      issue.State === "open"
                         ? "fa-regular fa-circle-dot text-rambler-turquoise"
                         : "fa-solid fa-circle-check text-rambler-violet",
                     )}
@@ -143,30 +140,30 @@ export function IssuesList() {
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-white">{issue.title}</span>
-                      {issue.labels.map((l) => (
+                      <span className="font-medium text-white">{issue.Title}</span>
+                      {issue.Labels.map((l) => (
                         <span
-                          key={l.name}
+                          key={l.Name}
                           className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium"
                           style={{
-                            color: `#${l.color}`,
-                            borderColor: `#${l.color}66`,
-                            backgroundColor: `#${l.color}1a`,
+                            color: `#${l.Color}`,
+                            borderColor: `#${l.Color}66`,
+                            backgroundColor: `#${l.Color}1a`,
                           }}
                         >
-                          {l.name}
+                          {l.Name}
                         </span>
                       ))}
                     </div>
                     <div className="mt-1 text-xs text-white/40">
-                      #{issue.number} · opened {timeAgo(issue.created_at)}
-                      {issue.user ? ` by ${issue.user.login}` : ""}
+                      #{issue.Number} · opened {timeAgo(issue.CreatedAt)}
+                      {issue.Author ? ` by ${issue.Author}` : ""}
                     </div>
                   </div>
-                  {issue.comments > 0 && (
+                  {issue.Comments > 0 && (
                     <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 text-xs text-white/40">
                       <i className="fa-regular fa-comment text-[11px]" />
-                      {issue.comments}
+                      {issue.Comments}
                     </span>
                   )}
                 </a>

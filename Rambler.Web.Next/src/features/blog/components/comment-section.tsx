@@ -1,15 +1,48 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ApiError } from "@/lib/api/http";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { commentsApi, type BlogComment } from "@/features/blog/api/comments.api";
 
-/** How often to re-fetch the first page so the thread stays roughly live. */
-const POLL_MS = 20_000;
+/**
+ * Slow reconciliation poll. Live updates arrive over SSE; this is just a
+ * safety net that re-fetches the first page for events missed while the
+ * stream was down (reconnects, dropped messages).
+ */
+const POLL_MS = 60_000;
+
+/** Shape of a single Server-Sent comment event (PascalCase, viewer-agnostic). */
+interface CommentStreamEvent {
+  Action: "created" | "edited" | "deleted";
+  Comment: BlogComment | null;
+  Id: number | null;
+}
+
+/**
+ * Upsert a live-streamed comment by Id. Streamed copies always carry
+ * `CanEdit=false`/`CanDelete=false` (the stream doesn't know the viewer), so an
+ * existing local `true` is never downgraded.
+ */
+function upsertStreamed(
+  list: BlogComment[],
+  incoming: BlogComment,
+): BlogComment[] {
+  const idx = list.findIndex((c) => c.Id === incoming.Id);
+  if (idx === -1) return [...list, incoming];
+  const existing = list[idx];
+  const next = [...list];
+  next[idx] = {
+    ...incoming,
+    CanEdit: incoming.CanEdit || existing.CanEdit,
+    CanDelete: incoming.CanDelete || existing.CanDelete,
+  };
+  return next;
+}
 
 /** Format an ISO timestamp as a short relative time ("just now", "3h ago"). */
 function relativeTime(iso: string): string {
@@ -144,6 +177,78 @@ export function CommentSection({ slug }: { slug: string }) {
       clearInterval(timer);
     };
   }, [slug, applyMeta, mergeComments]);
+
+  // Mirror the set of loaded ids into refs so the (stable) SSE handlers can
+  // check presence without re-subscribing the stream on every state change.
+  const knownIdsRef = useRef<Set<number>>(new Set());
+  const rootIdsRef = useRef<Set<number>>(new Set());
+  useEffect(() => {
+    rootIdsRef.current = new Set(roots.map((c) => c.Id));
+    knownIdsRef.current = new Set(
+      [...roots, ...replies].map((c) => c.Id),
+    );
+  }, [roots, replies]);
+
+  // --- Live stream handlers (stable: only touch setters + refs) ---
+
+  // A streamed comment is created: upsert it (preserving any local edit/delete
+  // rights), and bump the count only for a genuinely new top-level comment so
+  // the poster's own optimistic copy doesn't double-count.
+  const applyCreated = useCallback((incoming: BlogComment) => {
+    const wasPresent = knownIdsRef.current.has(incoming.Id);
+    if (incoming.ParentId === null) {
+      setRoots((prev) => sortRootsDesc(upsertStreamed(prev, incoming)));
+      if (!wasPresent) setTotalCount((n) => n + 1);
+    } else {
+      setReplies((prev) => upsertStreamed(prev, incoming));
+    }
+  }, []);
+
+  // An edit: patch Body/EditedOn in place if we already hold the comment,
+  // leaving the local CanEdit/CanDelete untouched.
+  const applyEdited = useCallback((incoming: BlogComment) => {
+    const patch = (c: BlogComment): BlogComment =>
+      c.Id === incoming.Id
+        ? { ...c, Body: incoming.Body, EditedOn: incoming.EditedOn }
+        : c;
+    setRoots((prev) =>
+      prev.some((c) => c.Id === incoming.Id) ? prev.map(patch) : prev,
+    );
+    setReplies((prev) =>
+      prev.some((c) => c.Id === incoming.Id) ? prev.map(patch) : prev,
+    );
+  }, []);
+
+  // A deletion: drop the id; if it was a root, drop its replies too and
+  // decrement the count.
+  const applyDeleted = useCallback((id: number) => {
+    const wasRoot = rootIdsRef.current.has(id);
+    setRoots((prev) => prev.filter((c) => c.Id !== id));
+    setReplies((prev) => prev.filter((c) => c.Id !== id && c.ParentId !== id));
+    if (wasRoot) setTotalCount((n) => Math.max(0, n - 1));
+  }, []);
+
+  // Subscribe to the live comment stream. EventSource swallows keep-alive
+  // comment lines and auto-reconnects; the slow poll covers anything missed.
+  useEffect(() => {
+    const source = new EventSource(`/api/Blog/${slug}/comments/stream`);
+    source.onmessage = (event) => {
+      let msg: CommentStreamEvent;
+      try {
+        msg = JSON.parse(event.data) as CommentStreamEvent;
+      } catch {
+        return;
+      }
+      if (msg.Action === "created" && msg.Comment) {
+        applyCreated(msg.Comment);
+      } else if (msg.Action === "edited" && msg.Comment) {
+        applyEdited(msg.Comment);
+      } else if (msg.Action === "deleted" && msg.Id !== null) {
+        applyDeleted(msg.Id);
+      }
+    };
+    return () => source.close();
+  }, [slug, applyCreated, applyEdited, applyDeleted]);
 
   const repliesByParent = useMemo(() => {
     const map = new Map<number, BlogComment[]>();
@@ -333,6 +438,7 @@ export function CommentSection({ slug }: { slug: string }) {
                   comment={comment}
                   replies={repliesByParent.get(comment.Id) ?? []}
                   canComment={canComment}
+                  canModerate={canModerate}
                   onPosted={handlePosted}
                   onDelete={handleDelete}
                   onEdited={upsertComment}
@@ -375,6 +481,7 @@ function CommentItem({
   comment,
   replies,
   canComment,
+  canModerate,
   onPosted,
   onDelete,
   onEdited,
@@ -383,6 +490,7 @@ function CommentItem({
   comment: BlogComment;
   replies: BlogComment[];
   canComment: boolean;
+  canModerate: boolean;
   onPosted: (comment: BlogComment) => void;
   onDelete: (id: number) => void;
   onEdited: (comment: BlogComment) => void;
@@ -391,7 +499,12 @@ function CommentItem({
 
   return (
     <li>
-      <CommentBody comment={comment} onDelete={onDelete} onEdited={onEdited} />
+      <CommentBody
+        comment={comment}
+        canModerate={canModerate}
+        onDelete={onDelete}
+        onEdited={onEdited}
+      />
 
       <div className="mt-2 pl-[3.25rem]">
         {canComment && (
@@ -426,6 +539,7 @@ function CommentItem({
             <li key={reply.Id}>
               <CommentBody
                 comment={reply}
+                canModerate={canModerate}
                 onDelete={onDelete}
                 onEdited={onEdited}
               />
@@ -443,13 +557,18 @@ function CommentItem({
  */
 function CommentBody({
   comment,
+  canModerate,
   onDelete,
   onEdited,
 }: {
   comment: BlogComment;
+  canModerate: boolean;
   onDelete: (id: number) => void;
   onEdited: (comment: BlogComment) => void;
 }) {
+  // Streamed copies carry CanDelete=false, so moderators lean on canModerate;
+  // edit stays author-only (CanEdit rides the author's optimistic copy).
+  const canDelete = comment.CanDelete || canModerate;
   const [confirming, setConfirming] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editBody, setEditBody] = useState(comment.Body);
@@ -513,7 +632,7 @@ function CommentBody({
             </span>
           )}
 
-          {(comment.CanEdit || comment.CanDelete) && !editing && (
+          {(comment.CanEdit || canDelete) && !editing && (
             <span className="ml-auto flex items-center gap-2">
               {confirming ? (
                 <>
@@ -544,7 +663,7 @@ function CommentBody({
                       <i className="fa-solid fa-pencil text-xs" />
                     </button>
                   )}
-                  {comment.CanDelete && (
+                  {canDelete && (
                     <button
                       type="button"
                       onClick={() => setConfirming(true)}
@@ -629,8 +748,13 @@ function Composer({
       const created = await commentsApi.addComment(slug, trimmed, parentId);
       onPosted(created);
       setBody("");
-    } catch {
-      setError("Couldn’t post your comment. Please try again.");
+    } catch (err) {
+      // A 404 means the post won't accept comments (unknown/removed slug).
+      if (err instanceof ApiError && err.status === 404) {
+        setError("This post isn’t available for comments.");
+      } else {
+        setError("Couldn’t post your comment. Please try again.");
+      }
     } finally {
       setSending(false);
     }

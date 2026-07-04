@@ -3,13 +3,21 @@ namespace Rambler.Server.WebService.Controllers
     using Database;
     using Database.Models;
     using Microsoft.AspNetCore.Authorization;
+    using Microsoft.AspNetCore.Http;
+    using Microsoft.AspNetCore.Http.Features;
     using Microsoft.AspNetCore.Identity;
     using Microsoft.AspNetCore.Mvc;
     using Microsoft.EntityFrameworkCore;
+    using Newtonsoft.Json;
+    using Newtonsoft.Json.Linq;
+    using Services;
     using System;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Net.Http;
+    using System.Threading;
+    using System.Threading.Channels;
     using System.Threading.Tasks;
 
     [Route("Blog")]
@@ -26,18 +34,51 @@ namespace Rambler.Server.WebService.Controllers
         private static readonly ConcurrentDictionary<Guid, DateTime> LastPostByUser =
             new ConcurrentDictionary<Guid, DateTime>();
 
+        /// <summary>How often the SSE stream sends a keep-alive comment when idle.</summary>
+        private static readonly TimeSpan StreamKeepAlive = TimeSpan.FromSeconds(20);
+
+        /// <summary>Shared client for the GitHub proxy (one instance avoids socket exhaustion).</summary>
+        private static readonly HttpClient GitHub = CreateGitHubClient();
+
+        /// <summary>How long the GitHub issues response is cached in-memory.</summary>
+        private static readonly TimeSpan IssuesCacheTtl = TimeSpan.FromSeconds(60);
+
+        private static readonly object IssuesCacheLock = new object();
+        private static IssueDto[] issuesCache;
+        private static DateTime issuesCachedAt;
+
         private readonly ApplicationDbContext db;
         private readonly UserManager<ApplicationUser> userManager;
         private readonly Socket.IAuthorize authorizor;
+        private readonly BlogPostCatalog catalog;
+        private readonly BlogCommentBroadcaster broadcaster;
+        private readonly Microsoft.Extensions.Configuration.IConfiguration configuration;
 
         public BlogController(
             ApplicationDbContext db,
             UserManager<ApplicationUser> userManager,
-            Socket.IAuthorize authorizor)
+            Socket.IAuthorize authorizor,
+            BlogPostCatalog catalog,
+            BlogCommentBroadcaster broadcaster,
+            Microsoft.Extensions.Configuration.IConfiguration configuration)
         {
             this.db = db;
             this.userManager = userManager;
             this.authorizor = authorizor;
+            this.catalog = catalog;
+            this.broadcaster = broadcaster;
+            this.configuration = configuration;
+        }
+
+        private static HttpClient CreateGitHubClient()
+        {
+            var client = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(10),
+            };
+            // GitHub rejects requests without a User-Agent.
+            client.DefaultRequestHeaders.Add("User-Agent", "rambler");
+            return client;
         }
 
         /// <summary>
@@ -132,11 +173,91 @@ namespace Rambler.Server.WebService.Controllers
             });
         }
 
+        /// <summary>
+        /// Server-Sent Events stream of live comment changes for a post. Public.
+        /// Emits one <c>data:</c> event per created/edited/deleted comment and a
+        /// <c>:ka</c> keep-alive comment when idle. The DTO is viewer-agnostic
+        /// (CanEdit/CanDelete are always false); the client personalizes rights.
+        /// </summary>
+        [HttpGet("{slug}/comments/stream")]
+        [AllowAnonymous]
+        public async Task StreamComments(string slug)
+        {
+            Response.ContentType = "text/event-stream";
+            Response.Headers["Cache-Control"] = "no-cache";
+            Response.Headers["Connection"] = "keep-alive";
+            // Tell reverse proxies (nginx) not to buffer the stream.
+            Response.Headers["X-Accel-Buffering"] = "no";
+            HttpContext.Features.Get<IHttpBufferingFeature>()?.DisableResponseBuffering();
+
+            var cancellation = HttpContext.RequestAborted;
+            var (id, reader) = broadcaster.Subscribe(slug);
+            try
+            {
+                // Flush the headers immediately so the client's connection opens.
+                await Response.Body.FlushAsync(cancellation);
+
+                while (!cancellation.IsCancellationRequested)
+                {
+                    string json = null;
+                    var received = false;
+
+                    // Wake up at least every keep-alive interval, or sooner on an event.
+                    using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation))
+                    {
+                        timeout.CancelAfter(StreamKeepAlive);
+                        try
+                        {
+                            json = await reader.ReadAsync(timeout.Token);
+                            received = true;
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            // Either the keep-alive fired or the client went away.
+                        }
+                        catch (ChannelClosedException)
+                        {
+                            break;
+                        }
+                    }
+
+                    if (cancellation.IsCancellationRequested)
+                    {
+                        break;
+                    }
+
+                    if (received && json != null)
+                    {
+                        await Response.WriteAsync("data: " + json + "\n\n", cancellation);
+                    }
+                    else
+                    {
+                        await Response.WriteAsync(":ka\n\n", cancellation);
+                    }
+
+                    await Response.Body.FlushAsync(cancellation);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Client disconnected mid-write; nothing to do.
+            }
+            finally
+            {
+                broadcaster.Unsubscribe(slug, id);
+            }
+        }
+
         /// <summary>Leave a comment (or reply) on a blog post. Registered users or valid guests.</summary>
         [HttpPost("{slug}/comments")]
         [AllowAnonymous]
         public async Task<IActionResult> PostComment(string slug, [FromQuery] string token, [FromBody] CommentRequest request)
         {
+            if (!catalog.IsKnown(slug))
+            {
+                return NotFound();
+            }
+
             var identity = await ResolveIdentity(token);
             if (identity.UserId == null)
             {
@@ -195,6 +316,9 @@ namespace Rambler.Server.WebService.Controllers
 
             LastPostByUser[userId] = DateTime.UtcNow;
 
+            // Push to live viewers with a viewer-agnostic DTO (the client personalizes rights).
+            PublishComment(comment.PostSlug, "created", ToStreamDto(comment), null);
+
             var dto = ToDto(comment, identity);
             dto.CanDelete = true;
             return Ok(dto);
@@ -237,6 +361,8 @@ namespace Rambler.Server.WebService.Controllers
             comment.EditedOn = DateTime.UtcNow;
             await db.SaveChangesAsync();
 
+            PublishComment(comment.PostSlug, "edited", ToStreamDto(comment), null);
+
             return Ok(ToDto(comment, identity));
         }
 
@@ -262,6 +388,8 @@ namespace Rambler.Server.WebService.Controllers
                 return StatusCode(403, "You can't delete that comment.");
             }
 
+            var slug = comment.PostSlug;
+
             db.BlogComments.Remove(comment);
 
             if (comment.ParentId == null)
@@ -274,6 +402,9 @@ namespace Rambler.Server.WebService.Controllers
 
             await db.SaveChangesAsync();
 
+            // Publish the removed root id; live clients drop its replies themselves.
+            PublishComment(slug, "deleted", null, id);
+
             return NoContent();
         }
 
@@ -282,6 +413,11 @@ namespace Rambler.Server.WebService.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> SetModeration(string slug, [FromQuery] string token, [FromBody] ModerationRequest request)
         {
+            if (!catalog.IsKnown(slug))
+            {
+                return NotFound();
+            }
+
             var identity = await ResolveIdentity(token);
             if (!identity.IsModerator)
             {
@@ -354,6 +490,145 @@ namespace Rambler.Server.WebService.Controllers
                 CanModerate = identity.IsModerator,
                 Posts = posts,
             });
+        }
+
+        /// <summary>
+        /// Server-side proxy for the project's GitHub issues (used by the changelog page),
+        /// so the token stays server-side and rate limits are higher. Pull requests are
+        /// filtered out and the mapped result is cached in-memory for ~60s. Public.
+        /// </summary>
+        [HttpGet("issues")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetIssues()
+        {
+            lock (IssuesCacheLock)
+            {
+                if (issuesCache != null && DateTime.UtcNow - issuesCachedAt < IssuesCacheTtl)
+                {
+                    return Ok(issuesCache);
+                }
+            }
+
+            var repo = configuration["Blog:GitHubRepo"];
+            if (string.IsNullOrWhiteSpace(repo))
+            {
+                repo = "8labs/rambler";
+            }
+
+            var token = configuration["Blog:GitHubToken"];
+            var url = "https://api.github.com/repos/" + repo +
+                "/issues?state=all&per_page=100&sort=updated";
+
+            try
+            {
+                using (var httpRequest = new HttpRequestMessage(HttpMethod.Get, url))
+                {
+                    if (!string.IsNullOrWhiteSpace(token))
+                    {
+                        httpRequest.Headers.Add("Authorization", "Bearer " + token);
+                    }
+
+                    using (var response = await GitHub.SendAsync(httpRequest))
+                    {
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            return StatusCode(502, "GitHub request failed.");
+                        }
+
+                        var raw = await response.Content.ReadAsStringAsync();
+                        var issues = MapIssues(JArray.Parse(raw));
+
+                        lock (IssuesCacheLock)
+                        {
+                            issuesCache = issues;
+                            issuesCachedAt = DateTime.UtcNow;
+                        }
+
+                        return Ok(issues);
+                    }
+                }
+            }
+            catch (HttpRequestException)
+            {
+                return StatusCode(502, "GitHub request failed.");
+            }
+            catch (TaskCanceledException)
+            {
+                return StatusCode(502, "GitHub request timed out.");
+            }
+            catch (JsonException)
+            {
+                return StatusCode(502, "GitHub response was not understood.");
+            }
+        }
+
+        /// <summary>Map GitHub's issue JSON to the trimmed client shape, dropping pull requests.</summary>
+        private static IssueDto[] MapIssues(JArray items)
+        {
+            var mapped = new List<IssueDto>();
+            foreach (var item in items)
+            {
+                if (!(item is JObject issue))
+                {
+                    continue;
+                }
+
+                // Issues and PRs share the endpoint; PRs carry a "pull_request" object.
+                if (issue["pull_request"] != null)
+                {
+                    continue;
+                }
+
+                var labels = new List<LabelDto>();
+                if (issue["labels"] is JArray labelArray)
+                {
+                    foreach (var label in labelArray.OfType<JObject>())
+                    {
+                        labels.Add(new LabelDto
+                        {
+                            Name = (string)label["name"],
+                            Color = (string)label["color"],
+                        });
+                    }
+                }
+
+                mapped.Add(new IssueDto
+                {
+                    Number = (long?)issue["number"] ?? 0,
+                    Title = (string)issue["title"],
+                    State = (string)issue["state"],
+                    Url = (string)issue["html_url"],
+                    Comments = (int?)issue["comments"] ?? 0,
+                    CreatedAt = (string)issue["created_at"],
+                    Author = (string)(issue["user"]?["login"]),
+                    Labels = labels.ToArray(),
+                });
+            }
+
+            return mapped.ToArray();
+        }
+
+        /// <summary>Serialize and fan out a comment event to the post's live subscribers.</summary>
+        private void PublishComment(string slug, string action, CommentDto comment, long? id)
+        {
+            var payload = new CommentEvent
+            {
+                Action = action,
+                Comment = comment,
+                Id = id,
+            };
+
+            // Same serializer/casing (PascalCase) as the rest of the API.
+            broadcaster.Publish(slug, JsonConvert.SerializeObject(payload));
+        }
+
+        /// <summary>A viewer-agnostic DTO for the shared stream (no per-caller edit/delete rights).</summary>
+        private static CommentDto ToStreamDto(BlogComment c)
+        {
+            var dto = ToDto(c, new Identity());
+            dto.CanEdit = false;
+            dto.CanDelete = false;
+            return dto;
         }
 
         /// <summary>Map a stored comment to its client shape, honoring the caller's rights.</summary>
@@ -567,6 +842,50 @@ namespace Rambler.Server.WebService.Controllers
             public bool CanModerate { get; set; }
 
             public PostStateDto[] Posts { get; set; }
+        }
+
+        /// <summary>A single live update pushed over the SSE stream.</summary>
+        public class CommentEvent
+        {
+            /// <summary>One of "created", "edited", or "deleted".</summary>
+            public string Action { get; set; }
+
+            /// <summary>The affected comment for "created"/"edited"; null for "deleted".</summary>
+            public CommentDto Comment { get; set; }
+
+            /// <summary>The removed comment's id for "deleted"; null otherwise.</summary>
+            public long? Id { get; set; }
+        }
+
+        /// <summary>A trimmed GitHub issue returned by the changelog proxy.</summary>
+        public class IssueDto
+        {
+            public long Number { get; set; }
+
+            public string Title { get; set; }
+
+            public string State { get; set; }
+
+            /// <summary>The issue's <c>html_url</c> on GitHub.</summary>
+            public string Url { get; set; }
+
+            public int Comments { get; set; }
+
+            /// <summary>ISO-8601 creation timestamp, passed through as GitHub reports it.</summary>
+            public string CreatedAt { get; set; }
+
+            /// <summary>The issue author's login.</summary>
+            public string Author { get; set; }
+
+            public LabelDto[] Labels { get; set; }
+        }
+
+        /// <summary>A trimmed GitHub issue label.</summary>
+        public class LabelDto
+        {
+            public string Name { get; set; }
+
+            public string Color { get; set; }
         }
     }
 }

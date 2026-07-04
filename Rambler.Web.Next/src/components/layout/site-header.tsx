@@ -31,6 +31,15 @@ export function SiteHeader() {
       </Link>
 
       <div className="flex items-center gap-1 sm:gap-2">
+        <a
+          href={GITHUB_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="View on GitHub"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+        >
+          <i className="fa-brands fa-github text-lg" />
+        </a>
         {navLinks.map((l) => (
           <Link
             key={l.href}
@@ -43,16 +52,6 @@ export function SiteHeader() {
             {l.label}
           </Link>
         ))}
-
-        <a
-          href={GITHUB_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="View on GitHub"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-        >
-          <i className="fa-brands fa-github text-lg" />
-        </a>
 
         {session ? (
           <Link href="/chat" className={cn(buttonVariants({ variant: "solid", size: "sm" }))}>

@@ -117,6 +117,14 @@
 
             services.AddTransient<EmailService>();
 
+            // Expose the Startup configuration (appsettings + all env vars) for injection.
+            // The bare WebHostBuilder otherwise only registers ASPNETCORE_-prefixed config.
+            services.AddSingleton<IConfiguration>(Configuration);
+
+            // Blog: the allowlist of known post slugs and the live-comment fan-out hub.
+            services.AddSingleton<BlogPostCatalog>();
+            services.AddSingleton<BlogCommentBroadcaster>();
+
             // Cross-origin access:
             //   Site:CorsOrigins    - comma-separated allow-list (use in production)
             //   Site:AllowAnyOrigin - "true" reflects ANY origin (handy for local/dev).
