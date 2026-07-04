@@ -71,10 +71,12 @@ export function CreateRoomButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-[10px] bg-[var(--glow-b)] px-3 py-1.5 text-sm font-semibold text-white transition-[filter] hover:brightness-110"
+        title="New room"
+        aria-label="New room"
+        className="inline-flex h-9 w-9 items-center justify-center gap-2 rounded-[10px] bg-[var(--glow-b)] text-sm font-semibold text-white transition-[filter] hover:brightness-110 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5"
       >
         <i className="fa-solid fa-plus text-[12px]" />
-        New room
+        <span className="hidden sm:inline">New room</span>
       </button>
 
       {open && (
