@@ -4,6 +4,7 @@ import { Reveal } from "@/components/ui/reveal";
 import { cn } from "@/lib/utils";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
+import { ArchitectureSection } from "@/features/marketing/components/architecture-section";
 import {
   RELEASES,
   changeTypeMeta,
@@ -22,7 +23,8 @@ export default function ChangelogPage() {
         <div className="flex min-h-full flex-col">
           <SiteHeader />
 
-          <section className="mx-auto w-full max-w-3xl flex-1 px-6 py-16 sm:py-20">
+          <div className="flex-1">
+          <section className="mx-auto w-full max-w-3xl px-6 py-16 sm:py-20">
             <Reveal className="max-w-2xl">
               <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] text-rambler-turquoise">
                 Changelog
@@ -91,6 +93,9 @@ export default function ChangelogPage() {
               ))}
             </ol>
           </section>
+
+          <ArchitectureSection />
+          </div>
 
           <SiteFooter />
         </div>

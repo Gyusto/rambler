@@ -7,7 +7,6 @@ import { buttonVariants } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
 import { cn } from "@/lib/utils";
 import { THEMES } from "@/features/theme/themes";
-import { ArchitectureSection } from "@/features/marketing/components/architecture-section";
 import { ScreenshotGallery } from "@/features/marketing/components/screenshot-gallery";
 import { ImageLightbox } from "@/features/marketing/components/image-lightbox";
 import { SiteHeader } from "@/components/layout/site-header";
@@ -191,9 +190,6 @@ export function LandingHero() {
           ))}
         </div>
       </section>
-
-      {/* Architecture */}
-      <ArchitectureSection />
 
       {/* Footer */}
       <div className="mt-auto">
