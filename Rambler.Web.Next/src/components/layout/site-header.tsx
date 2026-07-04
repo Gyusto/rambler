@@ -11,6 +11,7 @@ const GITHUB_URL = "https://github.com/8labs/rambler";
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/blog", label: "Blog" },
+  { href: "/changelog", label: "Changelog" },
 ];
 
 /** Shared top nav used across the public pages (landing, blog). */
