@@ -7,6 +7,7 @@ import { RoomBrowser } from "@/features/chat/components/lobby/room-browser";
 import { CreateRoomButton } from "@/features/chat/components/lobby/create-room-button";
 import { IgnoreListButton } from "@/features/chat/components/lobby/ignore-list-button";
 import { AdminPanelButton } from "@/features/chat/components/lobby/admin-panel-button";
+import { NotificationsBell } from "@/features/chat/components/lobby/notifications-panel";
 import { AccountSettingsModal } from "@/features/auth/components/account-settings-modal";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 
@@ -51,9 +52,7 @@ export function AppHeader() {
         <ThemeMenu />
         <IgnoreListButton />
         <AdminPanelButton />
-        <button type="button" className={iconBtn} title="Notifications" aria-label="Notifications">
-          <i className="fa-regular fa-bell" />
-        </button>
+        <NotificationsBell />
         <button
           type="button"
           className={iconBtn}

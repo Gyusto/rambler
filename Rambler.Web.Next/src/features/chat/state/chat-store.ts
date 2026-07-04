@@ -28,6 +28,7 @@ import {
   type ReplyRef,
   type ReplyTarget,
 } from "@/features/chat/types";
+import { useNotifications, mentions } from "@/features/chat/state/use-notifications";
 
 /** Map a message payload's reaction list to store shape. */
 export function mapReactions(d: { Reactions?: ReactionDto[] | null }): Reaction[] | undefined {
@@ -403,6 +404,18 @@ function handle(msg: ResponseEnvelope, set: Setter, get: Getter) {
         reactions: mapReactions(d),
         replyTo: mapReply(d),
       });
+      {
+        const me = get().nick;
+        if (d.UserId !== userId && me && mentions(d.Message ?? "", me)) {
+          useNotifications.getState().notify({
+            type: "mention",
+            convId: roomId,
+            convName: conversations[roomId]?.name ?? "a room",
+            fromNick: d.Nick ?? sender?.Nick ?? "Someone",
+            text: d.Message ?? "",
+          });
+        }
+      }
       break;
     }
     case MessageKey.CHTYPING: {
@@ -486,6 +499,15 @@ function handle(msg: ResponseEnvelope, set: Setter, get: Getter) {
         reactions: mapReactions(d),
         replyTo: mapReply(d),
       });
+      if (!self) {
+        useNotifications.getState().notify({
+          type: "dm",
+          convId: counterpart,
+          convName: senderNick,
+          fromNick: senderNick,
+          text: d.Message ?? "",
+        });
+      }
       break;
     }
     case MessageKey.CHBAN: {

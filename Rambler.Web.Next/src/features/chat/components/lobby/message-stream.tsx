@@ -57,13 +57,29 @@ function renderBody(m: ChatMessage) {
 
 /** Render text with `inline code` spans. */
 function renderText(text: string) {
-  return text.split(/(`[^`]+`)/g).map((part, i) =>
-    part.startsWith("`") && part.endsWith("`") ? (
-      <code key={i}>{part.slice(1, -1)}</code>
-    ) : (
-      <Fragment key={i}>{part}</Fragment>
-    ),
-  );
+  const me = useChatStore.getState().nick;
+  // Split into inline-code spans, @mentions, and plain text.
+  return text.split(/(`[^`]+`|@[\w-]+)/g).map((part, i) => {
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return <code key={i}>{part.slice(1, -1)}</code>;
+    }
+    if (part.length > 1 && part.startsWith("@")) {
+      const isMe = !!me && part.slice(1).toLowerCase() === me.toLowerCase();
+      return (
+        <span
+          key={i}
+          className={
+            isMe
+              ? "rounded bg-rambler-turquoise/25 px-1 font-medium text-rambler-turquoise"
+              : "font-medium text-rambler-turquoise"
+          }
+        >
+          {part}
+        </span>
+      );
+    }
+    return <Fragment key={i}>{part}</Fragment>;
+  });
 }
 
 export function MessageStream() {

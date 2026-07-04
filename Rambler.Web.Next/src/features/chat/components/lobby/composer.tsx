@@ -6,6 +6,7 @@ import { EmojiPicker } from "@/features/chat/components/lobby/emoji-picker";
 import { TypingIndicator } from "@/features/chat/components/lobby/typing-indicator";
 import { Spinner } from "@/components/ui/spinner";
 import { mediaApi } from "@/features/chat/api/media.api";
+import type { RoomUser } from "@/types/protocol";
 
 interface PendingFile {
   id: string;
@@ -21,6 +22,9 @@ export function Composer() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingFile[]>([]);
+  // @-mention autocomplete: the token being typed (null when inactive) + highlighted row
+  const [mention, setMention] = useState<{ start: number; end: number; query: string } | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const sendMessage = useChatStore((s) => s.sendMessage);
@@ -79,6 +83,47 @@ export function Composer() {
     if (!ta) return;
     ta.style.height = "auto";
     ta.style.height = `${Math.min(ta.scrollHeight, 140)}px`;
+  }
+
+  // Re-detect the @-token at the caret. Only rooms have a user list to pick from.
+  function syncMention(value: string, caret: number) {
+    if (active?.kind !== "room") {
+      setMention(null);
+      return;
+    }
+    const m = /(^|\s)@([\w-]*)$/.exec(value.slice(0, caret));
+    if (!m) {
+      setMention(null);
+      return;
+    }
+    const query = m[2];
+    setMention({ start: caret - query.length - 1, end: caret, query });
+    setMentionIndex(0);
+  }
+
+  function syncMentionFromEl() {
+    const ta = taRef.current;
+    if (ta) syncMention(ta.value, ta.selectionStart ?? ta.value.length);
+  }
+
+  // Replace the @partial token with "@Nick " and drop the caret after the space.
+  function selectMention(user: RoomUser) {
+    const ta = taRef.current;
+    if (!mention || !ta) return;
+    const value = ta.value;
+    const insert = `@${user.Nick} `;
+    const next = value.slice(0, mention.start) + insert + value.slice(mention.end);
+    const caret = mention.start + insert.length;
+    setText(next);
+    setMention(null);
+    requestAnimationFrame(() => {
+      const el = taRef.current;
+      if (el) {
+        el.focus();
+        el.selectionStart = el.selectionEnd = caret;
+      }
+      autosize();
+    });
   }
 
   function addFiles(files: File[]) {
@@ -149,6 +194,24 @@ export function Composer() {
     requestAnimationFrame(autosize);
     taRef.current?.focus();
   }
+
+  // Users matching the active @-token, startsWith first, capped for the dropdown.
+  const mentionMatches: RoomUser[] =
+    mention && active?.kind === "room"
+      ? (() => {
+          const q = mention.query.toLowerCase();
+          return active.users
+            .filter((u) => u.Nick.toLowerCase().includes(q))
+            .sort((a, b) => {
+              const aStarts = a.Nick.toLowerCase().startsWith(q) ? 0 : 1;
+              const bStarts = b.Nick.toLowerCase().startsWith(q) ? 0 : 1;
+              return aStarts - bStarts || a.Nick.localeCompare(b.Nick);
+            })
+            .slice(0, 8);
+        })()
+      : [];
+  const mentionOpen = mentionMatches.length > 0;
+  const activeMention = Math.min(mentionIndex, mentionMatches.length - 1);
 
   function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -258,29 +321,95 @@ export function Composer() {
           className="hidden"
           onChange={onPickFile}
         />
-        <textarea
-          ref={taRef}
-          rows={1}
-          placeholder={placeholder}
-          value={text}
-          disabled={!active}
-          aria-label="Message the lobby"
-          onChange={(e) => {
-            setText(e.target.value);
-            autosize();
-            if (active && e.target.value.trim()) signalTyping(active.id);
-            else stopTyping();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              submit();
-            } else if (e.key === "Escape" && replyTarget) {
-              e.preventDefault();
-              setReplyTarget(undefined);
-            }
-          }}
-        />
+        <div className="relative flex-1">
+          {mentionOpen && (
+            <ul
+              className="absolute bottom-full left-0 z-20 mb-2 max-h-64 w-60 overflow-y-auto rounded-lg border p-1 shadow-lg"
+              style={{ background: "var(--raised)", borderColor: "var(--line)" }}
+              role="listbox"
+            >
+              {mentionMatches.map((u, i) => (
+                <li key={u.Id}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={i === activeMention}
+                    // keep textarea focus so the caret/token survives the click
+                    onMouseDown={(e) => e.preventDefault()}
+                    onMouseEnter={() => setMentionIndex(i)}
+                    onClick={() => selectMention(u)}
+                    className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm ${
+                      i === activeMention ? "bg-rambler-turquoise/15" : ""
+                    }`}
+                    style={{ color: "var(--text)" }}
+                  >
+                    <span
+                      className="grid h-6 w-6 flex-none place-items-center rounded-full text-[11px] font-semibold uppercase"
+                      style={{ background: "var(--surface-2, var(--raised))", color: "var(--muted)" }}
+                    >
+                      {u.Nick.slice(0, 2)}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{u.Nick}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <textarea
+            ref={taRef}
+            rows={1}
+            className="w-full"
+            placeholder={placeholder}
+            value={text}
+            disabled={!active}
+            aria-label="Message the lobby"
+            onChange={(e) => {
+              setText(e.target.value);
+              autosize();
+              syncMention(e.target.value, e.target.selectionStart ?? e.target.value.length);
+              if (active && e.target.value.trim()) signalTyping(active.id);
+              else stopTyping();
+            }}
+            onKeyUp={syncMentionFromEl}
+            onClick={syncMentionFromEl}
+            onBlur={() => setMention(null)}
+            onKeyDown={(e) => {
+              if (mentionOpen) {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setMentionIndex((i) => (Math.min(i, mentionMatches.length - 1) + 1) % mentionMatches.length);
+                  return;
+                }
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setMentionIndex(
+                    (i) =>
+                      (Math.min(i, mentionMatches.length - 1) - 1 + mentionMatches.length) %
+                      mentionMatches.length,
+                  );
+                  return;
+                }
+                if (e.key === "Enter" || e.key === "Tab") {
+                  e.preventDefault();
+                  selectMention(mentionMatches[activeMention]);
+                  return;
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  setMention(null);
+                  return;
+                }
+              }
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                submit();
+              } else if (e.key === "Escape" && replyTarget) {
+                e.preventDefault();
+                setReplyTarget(undefined);
+              }
+            }}
+          />
+        </div>
         <button className="send" aria-label="Send message" disabled={!canSend} onClick={submit}>
           <i className="fa-solid fa-paper-plane" />
         </button>
