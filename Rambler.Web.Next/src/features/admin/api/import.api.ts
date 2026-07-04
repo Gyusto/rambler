@@ -46,4 +46,7 @@ export const importApi = {
   /** Register a batch of Anope channels. POST /import/registeranopechannel */
   registerChannels: (channels: AnopeChannelRegistration[]) =>
     http.post<unknown>("/import/registeranopechannel", channels),
+  /** Register a batch of Anope channel moderators. POST /import/registeranopechannelmoderators */
+  registerModerators: (moderators: AnopeChannelModerator[]) =>
+    http.post<unknown>("/import/registeranopechannelmoderators", moderators),
 };

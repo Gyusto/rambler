@@ -42,9 +42,9 @@ export const adminApi = {
   addServerBan: (ban: ServerBanDto) =>
     http.post<ServerBanDto>("/management/addserverbanforuser", ban),
 
-  /** POST /management/updateserverbanforuser - update an existing server ban (ban in body). */
+  /** POST /management/updateserverban - update an existing server ban (ban in body). */
   updateServerBan: (ban: ServerBanDto) =>
-    http.post<ServerBanDto>("/management/updateserverbanforuser", ban),
+    http.post<ServerBanDto>("/management/updateserverban", ban),
 
   /** POST /management/removeserverban?id= - remove a server ban by id (empty body). */
   removeServerBan: (ban: ServerBanDto) =>

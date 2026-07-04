@@ -151,6 +151,10 @@ function BansSection() {
   const [newReason, setNewReason] = useState("");
   const [adding, setAdding] = useState(false);
 
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editReason, setEditReason] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -178,6 +182,26 @@ function BansSection() {
       setError(messageFor(err, "Couldn't remove that ban. Please try again."));
     } finally {
       setRemovingId(null);
+    }
+  }
+
+  function startEdit(ban: ServerBanDto) {
+    setEditingId(ban.Id);
+    setEditReason(ban.Reason ?? "");
+    setError(null);
+  }
+
+  async function saveEdit(ban: ServerBanDto) {
+    setSavingEdit(true);
+    setError(null);
+    try {
+      await adminApi.updateServerBan({ ...ban, Reason: editReason.trim() });
+      setEditingId(null);
+      await load();
+    } catch (err) {
+      setError(messageFor(err, "Couldn't update that ban. Please try again."));
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -258,29 +282,73 @@ function BansSection() {
           {bans.map((ban) => (
             <li
               key={ban.Id}
-              className="flex items-center gap-3 rounded-lg border border-[var(--line)] px-3 py-2"
+              className="flex flex-col gap-2 rounded-lg border border-[var(--line)] px-3 py-2"
             >
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">
-                  {ban.BannedNick || ban.IPFilter || "Unknown"}
+              <div className="flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">
+                    {ban.BannedNick || ban.IPFilter || "Unknown"}
+                  </div>
+                  {editingId !== ban.Id && (
+                    <div className="truncate text-xs text-[var(--muted)]">
+                      {ban.Reason || "No reason given"}
+                    </div>
+                  )}
+                  <div className="truncate text-xs text-[var(--muted)]">
+                    {ban.Created ? formatDate(ban.Created) : ""}
+                    {ban.CreatedByNick ? ` · by ${ban.CreatedByNick}` : ""}
+                  </div>
                 </div>
-                <div className="truncate text-xs text-[var(--muted)]">
-                  {ban.Reason || "No reason given"}
-                </div>
-                <div className="truncate text-xs text-[var(--muted)]">
-                  {ban.Created ? formatDate(ban.Created) : ""}
-                  {ban.CreatedByNick ? ` · by ${ban.CreatedByNick}` : ""}
+                <div className="flex shrink-0 gap-1.5">
+                  {editingId !== ban.Id && (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-[var(--line)] px-2.5 py-1 text-xs text-[var(--text)] hover:bg-[var(--line)]"
+                      onClick={() => startEdit(ban)}
+                    >
+                      Edit
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-[var(--line)] px-2.5 py-1 text-xs text-[var(--text)] hover:bg-[var(--line)] disabled:opacity-50"
+                    disabled={removingId === ban.Id}
+                    onClick={() => remove(ban)}
+                  >
+                    {removingId === ban.Id && <Spinner className="h-3 w-3" />}
+                    {removingId === ban.Id ? "Removing" : "Remove"}
+                  </button>
                 </div>
               </div>
-              <button
-                type="button"
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--line)] px-2.5 py-1 text-xs text-[var(--text)] hover:bg-[var(--line)] disabled:opacity-50"
-                disabled={removingId === ban.Id}
-                onClick={() => remove(ban)}
-              >
-                {removingId === ban.Id && <Spinner className="h-3 w-3" />}
-                {removingId === ban.Id ? "Removing" : "Remove"}
-              </button>
+
+              {editingId === ban.Id && (
+                <div className="flex min-w-0 gap-2">
+                  <input
+                    value={editReason}
+                    autoFocus
+                    onChange={(e) => setEditReason(e.target.value)}
+                    placeholder="Reason"
+                    className="min-w-0 flex-1 rounded-md border border-[var(--line)] bg-[var(--surface)] px-2.5 py-1.5 text-sm text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
+                  />
+                  <button
+                    type="button"
+                    disabled={savingEdit}
+                    onClick={() => saveEdit(ban)}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[var(--glow-b)] px-3 py-1.5 text-xs font-medium text-white hover:brightness-110 disabled:opacity-50"
+                  >
+                    {savingEdit && <Spinner className="h-3 w-3" />}
+                    {savingEdit ? "Saving" : "Save"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={savingEdit}
+                    onClick={() => setEditingId(null)}
+                    className="inline-flex shrink-0 items-center rounded-md border border-[var(--line)] px-3 py-1.5 text-xs text-[var(--muted)] hover:bg-[var(--line)] hover:text-[var(--text)] disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
             </li>
           ))}
         </ul>
@@ -637,7 +705,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-type ImportKind = "full" | "users" | "channels";
+type ImportKind = "full" | "users" | "channels" | "moderators";
 
 /** Paste-JSON Anope migration importer (admin-only). */
 function ImportSection() {
@@ -662,7 +730,8 @@ function ImportSection() {
     try {
       if (kind === "full") await importApi.anope(parsed as never);
       else if (kind === "users") await importApi.registerUsers(parsed as never);
-      else await importApi.registerChannels(parsed as never);
+      else if (kind === "channels") await importApi.registerChannels(parsed as never);
+      else await importApi.registerModerators(parsed as never);
       setOk("Import completed.");
     } catch (err) {
       setError(messageFor(err, "Import failed. Check the payload and try again."));
@@ -676,7 +745,9 @@ function ImportSection() {
       ? '{ "Nicknames": [...], "Channels": [...], "Moderators": [...] }'
       : kind === "users"
         ? '[ { "nick": "...", "email": "...", "password": "...", "register_date": "...", "last_connection_date": "..." } ]'
-        : '[ { "name": "...", "founder": "...", "time_registered": "...", "forbidden": false } ]';
+        : kind === "channels"
+          ? '[ { "name": "...", "founder": "...", "time_registered": "...", "forbidden": false } ]'
+          : '[ { "nick": "...", "channel": "...", "level": 0, "last_seen": "..." } ]';
 
   return (
     <div className="flex flex-col gap-3">
@@ -690,6 +761,7 @@ function ImportSection() {
             { k: "full", label: "Full import" },
             { k: "users", label: "Users" },
             { k: "channels", label: "Channels" },
+            { k: "moderators", label: "Moderators" },
           ] as const
         ).map((o) => (
           <button
