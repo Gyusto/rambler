@@ -124,6 +124,61 @@ namespace Rambler.Server.WebService.Controllers
             return Ok();
         }
 
+        /// <summary>
+        /// Export the current users, channels and moderators in the same shape
+        /// the import accepts, so the data can be backed up or round-tripped.
+        /// Passwords are hashed and cannot be exported as plaintext.
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> Export()
+        {
+            if (await GetAdmin() == null)
+            {
+                return Unauthorized();
+            }
+
+            var users = await db.Users.ToListAsync();
+            var channels = await db.Channels.Include(c => c.Owner).ToListAsync();
+            var moderators = await db.ChannelModerators
+                .Include(m => m.User)
+                .Include(m => m.Channel)
+                .ToListAsync();
+
+            var export = new AnopeImport
+            {
+                Nicknames = users.Select(u => new AnopeNicknameRegistration
+                {
+                    nick = u.UserName,
+                    email = u.Email,
+                    register_date = u.RegistrationDate.ToString("o"),
+                    last_connection_date = u.LastSeenDate.ToString("o"),
+                    password = "",
+                }).ToArray(),
+                Channels = channels.Select(c => new AnopeChannelRegistration
+                {
+                    name = c.Name,
+                    founder = c.Owner?.UserName,
+                    successor = "",
+                    time_registered = c.Created.ToString("o"),
+                    last_used = c.LastActivity.ToString("o"),
+                    last_topic = c.Description,
+                    forbidden = false,
+                    forbidreason = "",
+                }).ToArray(),
+                Moderators = moderators.Select(m => new AnopeChannelModerator
+                {
+                    nick = m.User?.UserName,
+                    channel = m.Channel?.Name,
+                    level = m.Level >= ModerationLevel.Admin
+                        ? ChannelModeratorLevels.sop
+                        : ChannelModeratorLevels.aop,
+                    last_seen = "",
+                }).ToArray(),
+            };
+
+            return Ok(export);
+        }
+
         private async Task ImportUsers(AnopeNicknameRegistration[] registrations)
         {
             if (registrations == null)

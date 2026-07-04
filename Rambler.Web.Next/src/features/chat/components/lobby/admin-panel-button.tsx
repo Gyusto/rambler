@@ -716,6 +716,28 @@ function ImportSection() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  async function runExport() {
+    setExporting(true);
+    setError(null);
+    setOk(null);
+    try {
+      const data = await importApi.exportData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "rambler-export.json";
+      a.click();
+      URL.revokeObjectURL(url);
+      setOk("Export downloaded.");
+    } catch (err) {
+      setError(messageFor(err, "Export failed. Please try again."));
+    } finally {
+      setExporting(false);
+    }
+  }
 
   async function run() {
     setBusy(true);
@@ -753,6 +775,22 @@ function ImportSection() {
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Export current data */}
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--line)] p-3">
+        <div className="text-xs text-[var(--muted)]">
+          Download all users, channels and moderators as JSON.
+        </div>
+        <button
+          type="button"
+          onClick={runExport}
+          disabled={exporting}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--line)] px-3 py-1.5 text-sm font-medium text-[var(--text)] hover:bg-[var(--line)] disabled:opacity-50"
+        >
+          {exporting ? <Spinner className="h-4 w-4" /> : <i className="fa-solid fa-download" />}
+          {exporting ? "Exporting…" : "Export data"}
+        </button>
+      </div>
+
       <p className="text-xs text-[var(--muted)]">
         Migrate an Anope export. Paste the JSON payload for the selected type.
       </p>
