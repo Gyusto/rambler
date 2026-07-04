@@ -69,7 +69,7 @@
         [HttpPost]
         public async Task<IActionResult> RegisterChannel([FromBody] ChannelDto reg)
         {
-            if (string.IsNullOrWhiteSpace(reg.Name))
+            if (reg == null || string.IsNullOrWhiteSpace(reg.Name))
             {
                 return BadRequest("Invalid room name");
             }

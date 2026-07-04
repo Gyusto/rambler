@@ -52,11 +52,16 @@ export const channelsApi = {
    * Create a new channel or update an existing one, routed by presence of Id.
    * POST /channel/registerchannel (create) or /channel/updatechannel (update).
    */
-  addUpdateChannel: (channel: ChannelDto) =>
-    http.post<ChannelDto>(
-      `/channel/${channel.Id ? "updatechannel" : "registerchannel"}`,
-      channel,
-    ),
+  addUpdateChannel: (channel: ChannelDto) => {
+    // A new channel has no Id. The server DTO's Id is a Guid, so send the empty
+    // Guid (an empty string can't deserialize into a Guid and 500s the request),
+    // while still choosing the create route based on the original empty Id.
+    const isNew = !channel.Id;
+    return http.post<ChannelDto>(
+      `/channel/${isNew ? "registerchannel" : "updatechannel"}`,
+      isNew ? { ...channel, Id: "00000000-0000-0000-0000-000000000000" } : channel,
+    );
+  },
 
   /** Update an existing channel. POST /channel/updatechannel. */
   registerChannel: (channel: ChannelDto) =>
