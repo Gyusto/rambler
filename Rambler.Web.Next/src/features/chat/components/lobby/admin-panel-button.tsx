@@ -752,11 +752,20 @@ function ImportSection() {
       return;
     }
     try {
-      if (kind === "full") await importApi.anope(parsed as never);
-      else if (kind === "users") await importApi.registerUsers(parsed as never);
-      else if (kind === "channels") await importApi.registerChannels(parsed as never);
-      else await importApi.registerModerators(parsed as never);
-      setOk("Import completed.");
+      const tally = (r: { Created: number; Skipped: number }) =>
+        `${r.Created} added, ${r.Skipped} skipped`;
+      if (kind === "full") {
+        const s = await importApi.anope(parsed as never);
+        setOk(
+          `Users: ${tally(s.Users)} · Channels: ${tally(s.Channels)} · Moderators: ${tally(s.Moderators)}`,
+        );
+      } else if (kind === "users") {
+        setOk(tally(await importApi.registerUsers(parsed as never)));
+      } else if (kind === "channels") {
+        setOk(tally(await importApi.registerChannels(parsed as never)));
+      } else {
+        setOk(tally(await importApi.registerModerators(parsed as never)));
+      }
     } catch (err) {
       setError(messageFor(err, "Import failed. Check the payload and try again."));
     } finally {
@@ -771,7 +780,7 @@ function ImportSection() {
         ? '[ { "nick": "...", "email": "...", "password": "...", "register_date": "...", "last_connection_date": "..." } ]'
         : kind === "channels"
           ? '[ { "name": "...", "founder": "...", "time_registered": "...", "forbidden": false } ]'
-          : '[ { "nick": "...", "channel": "...", "level": 0, "last_seen": "..." } ]';
+          : '[ { "nick": "...", "channel": "...", "level": 5, "last_seen": "..." } ]  (level: 3 voice, 4 half-op, 5 op, 10 super-op)';
 
   return (
     <div className="flex flex-col gap-3">

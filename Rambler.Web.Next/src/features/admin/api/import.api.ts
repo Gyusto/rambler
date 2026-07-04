@@ -37,18 +37,31 @@ export interface AnopeImport {
   Moderators: AnopeChannelModerator[];
 }
 
+/** How many records an import created versus skipped. */
+export interface ImportResult {
+  Created: number;
+  Skipped: number;
+}
+
+/** Per-section results for a full import. */
+export interface ImportSummary {
+  Users: ImportResult;
+  Channels: ImportResult;
+  Moderators: ImportResult;
+}
+
 export const importApi = {
   /** Full Anope import (nicknames + channels + moderators). POST /import/anope */
-  anope: (data: AnopeImport) => http.post<unknown>("/import/anope", data),
+  anope: (data: AnopeImport) => http.post<ImportSummary>("/import/anope", data),
   /** Register a batch of Anope nicknames. POST /import/registeranopeuser */
   registerUsers: (users: AnopeNicknameRegistration[]) =>
-    http.post<unknown>("/import/registeranopeuser", users),
+    http.post<ImportResult>("/import/registeranopeuser", users),
   /** Register a batch of Anope channels. POST /import/registeranopechannel */
   registerChannels: (channels: AnopeChannelRegistration[]) =>
-    http.post<unknown>("/import/registeranopechannel", channels),
+    http.post<ImportResult>("/import/registeranopechannel", channels),
   /** Register a batch of Anope channel moderators. POST /import/registeranopechannelmoderators */
   registerModerators: (moderators: AnopeChannelModerator[]) =>
-    http.post<unknown>("/import/registeranopechannelmoderators", moderators),
+    http.post<ImportResult>("/import/registeranopechannelmoderators", moderators),
   /** Export the current users, channels and moderators. GET /import/export */
   exportData: () => http.get<AnopeImport>("/import/export"),
 };
