@@ -4,6 +4,8 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
+import { SiteHeader } from "@/components/layout/site-header";
+import { SiteFooter } from "@/components/layout/site-footer";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -57,7 +59,6 @@ function VerifyEmail() {
   }
 
   return (
-    <div className="flex h-full items-center justify-center p-4">
       <GlassCard className="w-full max-w-sm p-8">
         <h1 className="mb-1 text-center text-2xl font-semibold text-white">
           Verify email
@@ -128,16 +129,21 @@ function VerifyEmail() {
           </div>
         )}
       </GlassCard>
-    </div>
   );
 }
 
 export default function VerifyEmailPage() {
   return (
     <AppShell>
-      <Suspense fallback={<Loading label="Loading…" />}>
-        <VerifyEmail />
-      </Suspense>
+      <div className="flex h-full flex-col">
+        <SiteHeader />
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-4">
+          <Suspense fallback={<Loading label="Loading…" />}>
+            <VerifyEmail />
+          </Suspense>
+        </div>
+        <SiteFooter />
+      </div>
     </AppShell>
   );
 }
