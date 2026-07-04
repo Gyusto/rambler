@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { RoomSettingsModal } from "@/features/chat/components/lobby/room-settings-modal";
 import { useChatStore } from "@/features/chat/state/chat-store";
+import { useNotifications } from "@/features/chat/state/use-notifications";
 import { ConnectionStatus } from "@/features/chat/types";
 
 const dotClass: Record<ConnectionStatus, string> = {
@@ -19,6 +20,7 @@ export function TopBar({
   const active = useChatStore((s) => (s.activeId ? s.conversations[s.activeId] : undefined));
   const status = useChatStore((s) => s.status);
   const closeConversation = useChatStore((s) => s.closeConversation);
+  const convMuted = useNotifications((s) => s.mutedConvs.includes(active?.id ?? ""));
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const isRoom = active?.kind === "room";
@@ -56,6 +58,16 @@ export function TopBar({
         <button className="icon-btn" title="Search messages" aria-label="Search messages">
           <i className="fa-solid fa-magnifying-glass" />
         </button>
+        {active && (
+          <button
+            className="icon-btn"
+            title={convMuted ? "Unmute notifications" : "Mute notifications"}
+            aria-label={convMuted ? "Unmute notifications" : "Mute notifications"}
+            onClick={() => useNotifications.getState().toggleConvMute(active.id)}
+          >
+            <i className={`fa-solid ${convMuted ? "fa-bell-slash" : "fa-bell"}`} />
+          </button>
+        )}
         {isRoom && active && (
           <>
             <button

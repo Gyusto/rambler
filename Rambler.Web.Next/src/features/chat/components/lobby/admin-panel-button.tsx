@@ -9,13 +9,17 @@ import type {
   ServerUserSocketDto,
 } from "@/features/admin/api/admin.types";
 import { importApi } from "@/features/admin/api/import.api";
+import { mediaApi } from "@/features/chat/api/media.api";
+import { useNotifications } from "@/features/chat/state/use-notifications";
 import { Loading, Spinner } from "@/components/ui/spinner";
 import { ApiError } from "@/lib/api/http";
 
 /** All-zero GUID the server returns in Info.UserId when a nick isn't found. */
 const EMPTY_GUID = "00000000-0000-0000-0000-000000000000";
 
-type Tab = "bans" | "lookup" | "import";
+type Tab = "bans" | "lookup" | "import" | "sound";
+
+const DEFAULT_SOUND = "/sounds/notification.wav";
 
 /** Turn a thrown API error into a friendly, access-aware message. */
 function messageFor(err: unknown, fallback: string): string {
@@ -105,12 +109,16 @@ function AdminPanelModal({ onClose }: { onClose: () => void }) {
           <TabButton active={tab === "import"} onClick={() => setTab("import")}>
             Import
           </TabButton>
+          <TabButton active={tab === "sound"} onClick={() => setTab("sound")}>
+            Sound
+          </TabButton>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-3">
           {tab === "bans" && <BansSection />}
           {tab === "lookup" && <LookupSection />}
           {tab === "import" && <ImportSection />}
+          {tab === "sound" && <SoundSection />}
         </div>
       </div>
     </div>
@@ -845,6 +853,112 @@ function ImportSection() {
         {busy && <Spinner className="h-4 w-4" />}
         {busy ? "Importing…" : "Run import"}
       </button>
+
+      {error && <p className="text-center text-sm text-[var(--danger,#d9686c)]">{error}</p>}
+      {ok && <p className="text-center text-sm text-rambler-turquoise">{ok}</p>}
+    </div>
+  );
+}
+
+/** Admin control for the server-wide custom notification chime. */
+function SoundSection() {
+  const soundUrl = useNotifications((s) => s.soundUrl);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [ok, setOk] = useState<string | null>(null);
+
+  function testSound() {
+    try {
+      const audio = new Audio(soundUrl || DEFAULT_SOUND);
+      audio.volume = 0.5;
+      void audio.play().catch(() => {});
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setBusy(true);
+    setError(null);
+    setOk(null);
+    try {
+      const uploaded = await mediaApi.upload(file);
+      await adminApi.setNotificationSound(uploaded.url);
+      useNotifications.getState().setSoundUrl(uploaded.url);
+      setOk("Notification sound updated.");
+    } catch (err) {
+      setError(messageFor(err, "Couldn't set that sound. Please try again."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reset() {
+    setBusy(true);
+    setError(null);
+    setOk(null);
+    try {
+      await adminApi.setNotificationSound("");
+      useNotifications.getState().setSoundUrl(null);
+      setOk("Reset to the default sound.");
+    } catch (err) {
+      setError(messageFor(err, "Couldn't reset the sound. Please try again."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-xs text-[var(--muted)]">
+        Upload a custom chime that plays for everyone when they get a mention or direct message.
+        Leave it unset to use the built-in sound.
+      </p>
+
+      <div className="flex flex-col gap-2 rounded-lg border border-[var(--line)] p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-sm font-medium">Current sound</div>
+            <div className="truncate text-xs text-[var(--muted)]">
+              {soundUrl ? soundUrl : "Default"}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={testSound}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--text)] hover:bg-[var(--line)]"
+          >
+            <i className="fa-solid fa-play" />
+            Test sound
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-[var(--glow-b)] px-3.5 py-1.5 text-sm font-medium text-white hover:brightness-110 has-[:disabled]:cursor-default has-[:disabled]:opacity-50">
+          {busy ? <Spinner className="h-4 w-4" /> : <i className="fa-solid fa-upload" />}
+          {busy ? "Uploading…" : "Upload sound"}
+          <input
+            type="file"
+            accept="audio/*"
+            className="hidden"
+            disabled={busy}
+            onChange={onPick}
+          />
+        </label>
+        <button
+          type="button"
+          onClick={reset}
+          disabled={busy || !soundUrl}
+          className="inline-flex items-center gap-1.5 rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--text)] hover:bg-[var(--line)] disabled:opacity-50"
+        >
+          <i className="fa-solid fa-rotate-left" />
+          Reset to default
+        </button>
+      </div>
 
       {error && <p className="text-center text-sm text-[var(--danger,#d9686c)]">{error}</p>}
       {ok && <p className="text-center text-sm text-rambler-turquoise">{ok}</p>}

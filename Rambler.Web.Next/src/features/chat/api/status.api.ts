@@ -9,4 +9,6 @@ export const statusApi = {
   /** users currently in a named room. GET /status/getroomusercount?name= */
   roomUsers: (name: string) =>
     http.get<number>(`/status/getroomusercount?name=${encodeURIComponent(name)}`),
+  /** public client config, e.g. the custom notification sound URL. */
+  getConfig: () => http.get<{ NotificationSoundUrl: string | null }>("/status/config"),
 };

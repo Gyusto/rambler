@@ -20,6 +20,8 @@ namespace Rambler.Server.WebService.Controllers
             {
                 // images
                 ".png", ".jpg", ".jpeg", ".gif", ".webp",
+                // audio
+                ".mp3", ".wav", ".ogg", ".m4a", ".aac", ".webm",
                 // documents
                 ".pdf", ".txt", ".md", ".csv", ".json",
                 ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".zip",

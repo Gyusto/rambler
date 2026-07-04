@@ -67,5 +67,18 @@
             var count = await db.Users.LongCountAsync(u => u.LastSeenDate > ninetyDaysAgo);
             return Ok(count);
         }
+
+        /// <summary>Public client configuration, such as the admin-set notification sound.</summary>
+        [HttpGet]
+        [AllowAnonymous]
+        public async Task<IActionResult> Config()
+        {
+            var soundUrl = await db.AppSettings
+                .Where(s => s.Key == "notification.sound")
+                .Select(s => s.Value)
+                .FirstOrDefaultAsync();
+
+            return Ok(new { NotificationSoundUrl = soundUrl });
+        }
     }
 }

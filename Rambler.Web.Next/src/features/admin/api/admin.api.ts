@@ -52,4 +52,8 @@ export const adminApi = {
       `/management/removeserverban?${new URLSearchParams({ id: String(ban.Id) }).toString()}`,
       {},
     ),
+
+  /** POST /management/setnotificationsound - set the custom chime (empty Url resets to default). */
+  setNotificationSound: (url: string) =>
+    http.post<void>("/management/setnotificationsound", { Url: url }),
 };

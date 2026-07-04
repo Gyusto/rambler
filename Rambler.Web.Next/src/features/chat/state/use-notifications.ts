@@ -16,11 +16,25 @@ export interface AppNotification {
 
 const MAX_ITEMS = 50;
 const MUTE_KEY = "rambler.notifications.muted";
+const MUTED_CONVS_KEY = "rambler.notifications.mutedConvs";
+const DEFAULT_SOUND = "/sounds/notification.wav";
 
-/** Play the bundled notification chime. Silently no-ops if autoplay is blocked. */
-function playChime() {
+/** Read the persisted list of muted conversation ids. */
+function loadMutedConvs(): string[] {
+  if (typeof window === "undefined") return [];
   try {
-    const audio = new Audio("/sounds/notification.wav");
+    const raw = window.localStorage.getItem(MUTED_CONVS_KEY);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : null;
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Play a notification chime. Silently no-ops if autoplay is blocked. */
+function playChime(src: string) {
+  try {
+    const audio = new Audio(src);
     audio.volume = 0.5;
     void audio.play().catch(() => {});
   } catch {
@@ -51,17 +65,29 @@ function maybeDesktopNotification(n: AppNotification) {
 interface NotificationState {
   items: AppNotification[];
   muted: boolean;
+  /** Admin-configured custom chime URL, or null to use the bundled default. */
+  soundUrl: string | null;
+  /** Conversation ids the user has muted (persisted in localStorage). */
+  mutedConvs: string[];
   /** Record a new notification and (unless muted) play the sound + desktop alert. */
   notify: (n: Pick<AppNotification, "type" | "convId" | "convName" | "fromNick" | "text">) => void;
   markAllRead: () => void;
   remove: (id: string) => void;
   clear: () => void;
   toggleMute: () => void;
+  /** Set (or clear, with null) the custom notification sound URL. */
+  setSoundUrl: (url: string | null) => void;
+  /** Toggle per-conversation muting and persist it. */
+  toggleConvMute: (convId: string) => void;
+  /** True when the given conversation is muted. */
+  isConvMuted: (convId: string) => boolean;
 }
 
 export const useNotifications = create<NotificationState>((set, get) => ({
   items: [],
   muted: typeof window !== "undefined" && window.localStorage.getItem(MUTE_KEY) === "1",
+  soundUrl: null,
+  mutedConvs: loadMutedConvs(),
 
   notify: (n) => {
     const item: AppNotification = {
@@ -72,7 +98,7 @@ export const useNotifications = create<NotificationState>((set, get) => ({
     };
     set((s) => ({ items: [item, ...s.items].slice(0, MAX_ITEMS) }));
     if (!get().muted) {
-      playChime();
+      playChime(get().soundUrl || DEFAULT_SOUND);
       maybeDesktopNotification(item);
     }
   },
@@ -90,6 +116,23 @@ export const useNotifications = create<NotificationState>((set, get) => ({
       }
       return { muted };
     }),
+
+  setSoundUrl: (url) => set({ soundUrl: url || null }),
+
+  toggleConvMute: (convId) =>
+    set((s) => {
+      const mutedConvs = s.mutedConvs.includes(convId)
+        ? s.mutedConvs.filter((id) => id !== convId)
+        : [...s.mutedConvs, convId];
+      try {
+        window.localStorage.setItem(MUTED_CONVS_KEY, JSON.stringify(mutedConvs));
+      } catch {
+        /* ignore */
+      }
+      return { mutedConvs };
+    }),
+
+  isConvMuted: (convId) => get().mutedConvs.includes(convId),
 }));
 
 /** Unread notification count. */

@@ -406,7 +406,12 @@ function handle(msg: ResponseEnvelope, set: Setter, get: Getter) {
       });
       {
         const me = get().nick;
-        if (d.UserId !== userId && me && mentions(d.Message ?? "", me)) {
+        if (
+          d.UserId !== userId &&
+          me &&
+          mentions(d.Message ?? "", me) &&
+          !useNotifications.getState().isConvMuted(roomId)
+        ) {
           useNotifications.getState().notify({
             type: "mention",
             convId: roomId,
@@ -499,7 +504,7 @@ function handle(msg: ResponseEnvelope, set: Setter, get: Getter) {
         reactions: mapReactions(d),
         replyTo: mapReply(d),
       });
-      if (!self) {
+      if (!self && !useNotifications.getState().isConvMuted(counterpart)) {
         useNotifications.getState().notify({
           type: "dm",
           convId: counterpart,
