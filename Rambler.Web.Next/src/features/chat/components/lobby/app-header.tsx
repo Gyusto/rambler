@@ -57,7 +57,7 @@ export function AppHeader() {
         <button
           type="button"
           className={iconBtn}
-          title={nick ? `${nick} — account settings` : "Account settings"}
+          title={nick ? `${nick} - account settings` : "Account settings"}
           aria-label="Account settings"
           onClick={() => setSettingsOpen(true)}
         >

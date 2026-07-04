@@ -11,7 +11,7 @@ const SHOTS = [
   "/screens/shot-4.png",
 ];
 
-/** A masonry screenshot gallery — each shot opens full-screen on click. */
+/** A masonry screenshot gallery - each shot opens full-screen on click. */
 export function ScreenshotGallery() {
   return (
     <section className="mx-auto w-full max-w-6xl px-6 py-24">

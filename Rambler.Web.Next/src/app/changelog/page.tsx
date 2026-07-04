@@ -12,7 +12,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Changelog · Rambler",
-  description: "Every Rambler release, newest first — what's new, improved and fixed.",
+  description: "Every Rambler release, newest first - what's new, improved and fixed.",
 };
 
 export default function ChangelogPage() {
@@ -31,7 +31,7 @@ export default function ChangelogPage() {
                 What&apos;s new in Rambler
               </h1>
               <p className="mt-4 text-lg text-white/55">
-                Every release, newest first. We ship often — here&apos;s the trail.
+                Every release, newest first. We ship often - here&apos;s the trail.
               </p>
             </Reveal>
 

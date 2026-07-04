@@ -50,7 +50,7 @@ export interface CurrentChannel {
 
 export type ConversationKind = "room" | "dm";
 
-/** A room or a DM thread — the unit the UI switches between. */
+/** A room or a DM thread - the unit the UI switches between. */
 export interface Conversation {
   /** channel id for rooms, counterpart user id for DMs */
   id: string;

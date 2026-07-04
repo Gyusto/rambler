@@ -8,11 +8,11 @@
 
         public string CookieIdentity { get; set; }
 
-        // "None" | "Lax" | "Strict" | "Unspecified" — defaults to None (cross-site prod behind https).
+        // "None" | "Lax" | "Strict" | "Unspecified" - defaults to None (cross-site prod behind https).
         // For local http same-origin use "Lax", since None requires the Secure flag in modern browsers.
         public string CookieSameSite { get; set; } = "None";
 
-        // "None" | "Always" | "SameAsRequest" — whether the auth cookie is flagged Secure.
+        // "None" | "Always" | "SameAsRequest" - whether the auth cookie is flagged Secure.
         public string CookieSecure { get; set; } = "None";
 
         public bool AllowGuests { get; set; }
@@ -23,7 +23,7 @@
 
         // When true AND no SMTP is configured, newly registered users are auto-confirmed
         // (so accounts are immediately usable without an email verification link).
-        // Intended for local/dev only — MUST stay false in production, otherwise anyone
+        // Intended for local/dev only - MUST stay false in production, otherwise anyone
         // can register accounts for emails they don't own.
         public bool AutoConfirmEmail { get; set; }
 

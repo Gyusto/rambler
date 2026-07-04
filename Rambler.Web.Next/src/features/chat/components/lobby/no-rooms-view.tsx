@@ -52,7 +52,7 @@ export function NoRoomsView() {
   const emptyLabel =
     scope === "all"
       ? "No rooms found right now."
-      : "No active rooms right now — try browsing all rooms.";
+      : "No active rooms right now - try browsing all rooms.";
 
   return (
     <div className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto p-4 sm:p-6">

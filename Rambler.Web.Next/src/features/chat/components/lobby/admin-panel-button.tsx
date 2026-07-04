@@ -491,7 +491,7 @@ function LookupSection() {
                       key={s.Id}
                       className="flex items-center justify-between gap-2 rounded-md border border-[var(--line)] px-2 py-1 font-mono text-xs"
                     >
-                      <span className="truncate">{s.IPAddress || "—"}</span>
+                      <span className="truncate">{s.IPAddress || "-"}</span>
                       <span className="shrink-0 text-[var(--muted)]">{s.Id.slice(0, 8)}</span>
                     </li>
                   ))}

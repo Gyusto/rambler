@@ -76,7 +76,7 @@ function VerifyEmail() {
         {status === "success" && (
           <div className="space-y-5">
             <p className="text-center text-sm text-rambler-turquoise">
-              Email verified — you can sign in.
+              Email verified - you can sign in.
             </p>
             <Link href="/login" className="block">
               <Button className="w-full">Back to sign in</Button>

@@ -52,7 +52,7 @@ export const accountApi = {
 
   /**
    * Request an email-address change for the signed-in user (requires the login
-   * cookie). POST /account/RequestEmailChange?newEmail=... — `newEmail` binds
+   * cookie). POST /account/RequestEmailChange?newEmail=... - `newEmail` binds
    * from the query string, not the body.
    */
   requestEmailChange: (newEmail: string) =>
@@ -62,7 +62,7 @@ export const accountApi = {
 
   /**
    * Confirm an email-address change using the emailed token (requires the login
-   * cookie). POST /account/ValidateChangeEmail — reads `Email` + `Token`.
+   * cookie). POST /account/ValidateChangeEmail - reads `Email` + `Token`.
    */
   validateChangeEmail: (change: PasswordResetInput) =>
     http.post<void>("/account/ValidateChangeEmail", change),

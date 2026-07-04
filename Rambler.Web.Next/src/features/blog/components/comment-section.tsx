@@ -132,10 +132,10 @@ export function CommentSection({ slug }: { slug: string }) {
         .then((data) => {
           if (!active) return;
           applyMeta(data);
-          mergeComments(data.Comments); // merge only — leave nextCursor alone
+          mergeComments(data.Comments); // merge only - leave nextCursor alone
         })
         .catch(() => {
-          /* transient poll failure — keep what we have */
+          /* transient poll failure - keep what we have */
         });
     }, POLL_MS);
 
@@ -247,7 +247,7 @@ export function CommentSection({ slug }: { slug: string }) {
         )}
       </h2>
 
-      {/* Moderator toolbar — mod-only controls, styled distinctly. */}
+      {/* Moderator toolbar - mod-only controls, styled distinctly. */}
       {canModerate && (
         <div className="mt-6 flex flex-wrap items-center gap-3 rounded-2xl border border-rambler-self/40 bg-rambler-self/10 px-4 py-3">
           <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-rambler-self">
@@ -321,7 +321,7 @@ export function CommentSection({ slug }: { slug: string }) {
           </p>
         ) : roots.length === 0 ? (
           <p className="text-sm text-white/40">
-            No comments yet — start the conversation.
+            No comments yet - start the conversation.
           </p>
         ) : (
           <>

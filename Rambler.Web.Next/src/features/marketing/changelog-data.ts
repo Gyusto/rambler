@@ -56,7 +56,7 @@ export const RELEASES: Release[] = [
     date: "2026-07-03",
     summary: "Comments come to the blog, and the sign-in screens get a fresh look.",
     changes: [
-      { type: "new", text: "Blog comments and replies — guests can join in, not just members." },
+      { type: "new", text: "Blog comments and replies - guests can join in, not just members." },
       { type: "new", text: "Moderators can disable comments, remove a post, or delete a comment." },
       { type: "new", text: "Redesigned login and register pages with a live chat preview." },
       { type: "fixed", text: "Comment timestamps now show the correct relative time." },
@@ -87,7 +87,7 @@ export const RELEASES: Release[] = [
     date: "2026-06-12",
     summary: "Your name, your server.",
     changes: [
-      { type: "new", text: "Change your nickname live — guests and members alike." },
+      { type: "new", text: "Change your nickname live - guests and members alike." },
       { type: "new", text: "Self-host the whole stack with Docker and MinIO." },
       { type: "improved", text: "An .env switch to allow cross-origin access for local development." },
       { type: "fixed", text: "Guests keep the nickname they picked." },

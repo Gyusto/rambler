@@ -60,7 +60,7 @@ export function CreateRoomButton() {
       joinRoom(trimmed);
       close();
     } catch {
-      setError("Couldn't create that room — the name may be taken.");
+      setError("Couldn't create that room - the name may be taken.");
     } finally {
       setPending(false);
     }

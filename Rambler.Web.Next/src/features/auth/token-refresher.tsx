@@ -12,7 +12,7 @@ const REFRESH_INTERVAL_MS = 20 * 60 * 1000;
  * token fresh. It re-exchanges the token on an interval and whenever the window
  * regains focus, then stores the result via `useAuth`.
  *
- * No-ops for guests and when there is no session — guest tokens are long-lived
+ * No-ops for guests and when there is no session - guest tokens are long-lived
  * and reused on purpose, so there is nothing to refresh.
  */
 export function TokenRefresher() {

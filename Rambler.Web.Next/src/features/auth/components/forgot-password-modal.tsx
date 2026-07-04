@@ -173,7 +173,7 @@ export function ForgotPasswordModal({
         {step === "done" && (
           <div className="space-y-4">
             <p className="text-sm text-rambler-turquoise">
-              Password updated — you can sign in now.
+              Password updated - you can sign in now.
             </p>
             <Button type="button" className="w-full" onClick={onClose}>
               Back to sign in

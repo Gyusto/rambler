@@ -74,7 +74,7 @@ export function AccountSettingsModal({
       setNickMsg(`You're now "${next}".`);
       setNick("");
     } catch {
-      setNickErr("Couldn't change your nickname — it may be taken. Try another.");
+      setNickErr("Couldn't change your nickname - it may be taken. Try another.");
     } finally {
       setNickBusy(false);
     }
