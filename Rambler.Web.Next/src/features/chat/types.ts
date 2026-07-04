@@ -63,6 +63,10 @@ export interface Conversation {
   unread: number;
   /** my moderation level in this room */
   myLevel: number;
+  /** whether media (image/file) sharing is allowed here; default true when unknown */
+  allowMedia: boolean;
+  /** whether link sharing is allowed here; default true when unknown */
+  allowLinks: boolean;
   /** who is currently typing here: userId -> { nick, until (epoch ms) } */
   typing?: Record<string, { nick: string; until: number }>;
   /** true once stored history has been fetched; resets when the conv is reopened */

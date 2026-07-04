@@ -108,6 +108,8 @@
                 Description = reg.Description,
                 IsSecret = reg.IsSecret,
                 AllowGuests = reg.AllowGuests,
+                AllowMedia = reg.AllowMedia,
+                AllowLinks = reg.AllowLinks,
                 MaxUsers = 20,
             };
 
@@ -152,6 +154,8 @@
             // update room with options
             channel.IsSecret = reg.IsSecret;
             channel.AllowGuests = reg.AllowGuests;
+            channel.AllowMedia = reg.AllowMedia;
+            channel.AllowLinks = reg.AllowLinks;
             channel.Name = reg.Name;
             channel.Description = reg.Description;
             channel.LastModified = DateTime.UtcNow;
@@ -172,7 +176,9 @@
                     channel.AllowGuests,
                     channel.IsSecret,
                     channel.MaxUsers,
-                    channel.LastModified);
+                    channel.LastModified,
+                    channel.AllowMedia,
+                    channel.AllowLinks);
 
                 state.AddOrUpdateChannel(ch);
                 await dist.Publish(new Response<ChannelUpdateResponse>()
@@ -183,6 +189,8 @@
                         Name = channel.Name,
                         Description = channel.Description,
                         AllowsGuests = channel.AllowGuests,
+                        AllowMedia = channel.AllowMedia,
+                        AllowLinks = channel.AllowLinks,
                         IsSecret = channel.IsSecret,
                         LastModified = channel.LastModified,
                         MaxUsers = channel.MaxUsers,
@@ -909,6 +917,8 @@
                 Name = ch.Name,
                 Description = ch.Description,
                 AllowGuests = ch.AllowGuests,
+                AllowMedia = ch.AllowMedia,
+                AllowLinks = ch.AllowLinks,
                 MaxUsers = ch.MaxUsers,
                 IsSecret = ch.IsSecret,
                 Created = ch.Created,

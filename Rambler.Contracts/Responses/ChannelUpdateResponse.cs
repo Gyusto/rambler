@@ -13,6 +13,10 @@
 
         public bool AllowsGuests { get; set; }
 
+        public bool AllowMedia { get; set; }
+
+        public bool AllowLinks { get; set; }
+
         public bool IsSecret { get; set; }
 
         public int MaxUsers { get; set; }

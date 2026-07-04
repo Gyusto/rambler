@@ -35,6 +35,8 @@ export interface ChannelDto {
   Name: string;
   Description: string;
   AllowGuests: boolean;
+  AllowMedia: boolean;
+  AllowLinks: boolean;
   IsSecret: boolean;
   MaxUsers: number;
 }

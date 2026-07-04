@@ -68,6 +68,9 @@ export function Composer() {
 
   const hasPending = pending.length > 0;
   const canSend = !!active && !uploading && (text.trim().length > 0 || hasPending);
+  // media/link permissions default to allowed when the flag is unknown
+  const mediaAllowed = active?.allowMedia !== false;
+  const linksAllowed = active?.allowLinks !== false;
 
   let placeholder = "Connecting…";
   if (hasPending) placeholder = "Add a caption…";
@@ -241,23 +244,27 @@ export function Composer() {
           </button>
           {pickerOpen && <EmojiPicker onPick={insertEmoji} onClose={() => setPickerOpen(false)} />}
         </div>
-        <button
-          className="tool flex-none"
-          title="Attach files"
-          aria-label="Attach files"
-          disabled={!active || uploading}
-          onClick={() => fileRef.current?.click()}
-        >
-          {uploading ? <Spinner className="h-4 w-4" /> : <i className="fa-solid fa-paperclip" />}
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          multiple
-          accept="image/*,.pdf,.txt,.md,.csv,.json,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip"
-          className="hidden"
-          onChange={onPickFile}
-        />
+        {mediaAllowed && (
+          <>
+            <button
+              className="tool flex-none"
+              title="Attach files"
+              aria-label="Attach files"
+              disabled={!active || uploading}
+              onClick={() => fileRef.current?.click()}
+            >
+              {uploading ? <Spinner className="h-4 w-4" /> : <i className="fa-solid fa-paperclip" />}
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              accept="image/*,.pdf,.txt,.md,.csv,.json,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip"
+              className="hidden"
+              onChange={onPickFile}
+            />
+          </>
+        )}
         <textarea
           ref={taRef}
           rows={1}
@@ -287,6 +294,11 @@ export function Composer() {
       </div>
       <p className="hint">
         <kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line
+        {!linksAllowed && (
+          <span className="ml-2" style={{ color: "var(--muted)" }}>
+            · Link sharing is disabled in this channel
+          </span>
+        )}
       </p>
     </footer>
   );

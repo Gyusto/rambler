@@ -20,6 +20,10 @@
 
         public bool AllowsGuests { get; set; }
 
+        public bool AllowMedia { get; set; }
+
+        public bool AllowLinks { get; set; }
+
         public ModerationLevel Level { get; set; }
     }
 }

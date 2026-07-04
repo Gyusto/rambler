@@ -82,8 +82,10 @@
             public bool IsSecret { get; }
             public int MaxUsers { get; }
             public DateTime LastModified { get; }
+            public bool AllowsMedia { get; }
+            public bool AllowsLinks { get; }
 
-            public Channel(Guid id, Guid ownerId, string name, string description, bool allowsGuests, bool isSecret, int maxUsers, DateTime modified)
+            public Channel(Guid id, Guid ownerId, string name, string description, bool allowsGuests, bool isSecret, int maxUsers, DateTime modified, bool allowsMedia, bool allowsLinks)
             {
                 Id = id;
                 OwnerId = ownerId;
@@ -93,6 +95,8 @@
                 IsSecret = isSecret;
                 MaxUsers = maxUsers;
                 LastModified = modified;
+                AllowsMedia = allowsMedia;
+                AllowsLinks = allowsLinks;
             }
         }
 
