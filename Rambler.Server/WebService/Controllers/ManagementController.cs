@@ -396,7 +396,7 @@
             }
 
             var conn = await db.UserConnections
-               .Where(u => u.Nick.ToUpper() == nick.ToUpper())
+               .Where(u => u.Nick != null && u.Nick.ToUpper() == nick.ToUpper())
                .OrderByDescending(u => u.Id)
                .FirstOrDefaultAsync();
 

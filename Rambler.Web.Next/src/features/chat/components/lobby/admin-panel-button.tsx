@@ -76,7 +76,7 @@ function AdminPanelModal({ onClose }: { onClose: () => void }) {
       role="presentation"
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-xl border border-[var(--line)] bg-[var(--surface)] text-[var(--text)] shadow-xl"
+        className="flex h-[640px] max-h-[90vh] w-full max-w-2xl flex-col rounded-xl border border-[var(--line)] bg-[var(--surface)] text-[var(--text)] shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-label="Server administration"
@@ -212,7 +212,9 @@ function BansSection() {
     setAdding(true);
     setError(null);
     try {
-      // ServerBanDto is mostly server-populated; send the fields we can set.
+      // ServerBanDto is mostly server-populated. Created/Expires are non-nullable
+      // DateTimes on the server, so send real values: Created is overwritten with
+      // UtcNow server-side; a far-future Expires means the ban doesn't lapse.
       await adminApi.addServerBan({
         Id: 0,
         BannedUserId: null,
@@ -221,8 +223,8 @@ function BansSection() {
         Reason: newReason.trim(),
         CreatedById: "",
         CreatedByNick: "",
-        Created: "",
-        Expires: "",
+        Created: new Date().toISOString(),
+        Expires: "2999-12-31T00:00:00.000Z",
       });
       setNewNick("");
       setNewReason("");
