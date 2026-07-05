@@ -17,6 +17,7 @@
                 // apply any pending migrations before seeding (idempotent; no-op if already current)
                 .Initialize(provider => provider.GetRequiredService<ApplicationDbContext>().Database.Migrate())
                 .InitializeService<InitializeChannels>(c => c.SeedLobby())
+                .InitializeService<InitializeChannels>(c => c.EnsureServerAdmins())
                 .InitializeService<InitializeBots>(b => b.SeedBots())
                 .InitializeService<InitializeBots>(b => b.LoadBots())
                 .Run();

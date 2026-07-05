@@ -53,6 +53,7 @@ services:
       Site__AllowAnyOrigin: "${SITE_ALLOWANYORIGIN}"
       Site__CorsOrigins: "${SITE_CORSORIGINS}"
       Site__LobbyOwner: "${SITE_LOBBY_OWNER}"
+      Site__AdminNicks: "${SITE_ADMIN_NICKS}"
       Media__Endpoint: "${MEDIA_ENDPOINT}"
       Media__PublicUrl: "${MEDIA_PUBLIC_URL}"
       Media__AccessKey: "${MINIO_ROOT_USER}"

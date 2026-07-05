@@ -33,6 +33,36 @@ namespace Rambler.Server
             this.log = log;
         }
 
+        /// <summary>
+        /// Grant server admin to the accounts named in Site:AdminNicks. Runs on every
+        /// startup and is idempotent; a nick that doesn't exist yet is logged and skipped.
+        /// </summary>
+        public async Task EnsureServerAdmins()
+        {
+            if (string.IsNullOrWhiteSpace(site.AdminNicks))
+            {
+                return;
+            }
+
+            var nicks = site.AdminNicks.Split(new[] { ',', ' ', ';' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var nick in nicks)
+            {
+                var user = await userManager.FindByNameAsync(nick.Trim());
+                if (user == null)
+                {
+                    log.LogWarning("Configured admin nick not found: {nick}", nick);
+                    continue;
+                }
+
+                if (user.Level < ApplicationUser.UserLevel.Admin)
+                {
+                    user.Level = ApplicationUser.UserLevel.Admin;
+                    await userManager.UpdateAsync(user);
+                    log.LogInformation("Granted server admin to {nick}", nick);
+                }
+            }
+        }
+
         public async Task SeedLobby()
         {
             var existing = await db.Channels

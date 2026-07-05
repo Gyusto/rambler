@@ -30,6 +30,9 @@
         // username that owns the auto-seeded default "Lobby" channel (falls back to a system user)
         public string LobbyOwner { get; set; }
 
+        // comma/space-separated usernames granted server admin on startup
+        public string AdminNicks { get; set; }
+
         // CORS: comma-separated allow-list (production). Empty -> use AllowAnyOrigin.
         public string CorsOrigins { get; set; }
 
