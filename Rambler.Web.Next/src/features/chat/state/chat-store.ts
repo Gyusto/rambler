@@ -308,6 +308,23 @@ function applyReaction(get: Getter, set: Setter, d: ReactionData) {
   if (changed) set({ conversations: next });
 }
 
+/** Human role name for a moderation level, used in the "was made ..." notices. */
+function roleName(level: number): string {
+  if (level >= 1000) return "an admin";
+  if (level >= 150) return "the room owner";
+  if (level >= 100) return "an operator";
+  if (level >= 10) return "a moderator";
+  return "a member";
+}
+
+/** Notice describing a member's role change, or null when the level is unchanged. */
+function roleChangeText(nick: string, prevLevel: number, nextLevel: number): string | null {
+  if (nextLevel === prevLevel) return null;
+  if (nextLevel > prevLevel) return `${nick} was made ${roleName(nextLevel)}`;
+  if (nextLevel <= 0) return `${nick} is no longer ${roleName(prevLevel)}`;
+  return `${nick} was demoted to ${roleName(nextLevel)}`;
+}
+
 function systemMessage(convId: string, text: string, get: Getter, set: Setter) {
   addMessage(get, set, convId, {
     id: nextId(),
@@ -438,6 +455,7 @@ function handle(msg: ResponseEnvelope, set: Setter, get: Getter) {
       const roomId = msg.Subscription;
       const prev = get().conversations[roomId]?.users.find((u) => u.Id === d.UserId);
       const renamed = !!prev && prev.Nick !== d.Nick;
+      const roleText = prev ? roleChangeText(d.Nick, prev.ModLevel, d.Level) : null;
       const updated: RoomUser = { Id: d.UserId, Nick: d.Nick, IsGuest: d.IsGuest, ModLevel: d.Level };
       patchConv(get, set, roomId, (c) => ({
         ...c,
@@ -449,6 +467,7 @@ function handle(msg: ResponseEnvelope, set: Setter, get: Getter) {
         systemMessage(roomId, `${prev!.Nick} changed their name to ${d.Nick}`, get, set);
         if (d.UserId === get().userId) set({ nick: d.Nick });
       }
+      if (roleText) systemMessage(roomId, roleText, get, set);
       break;
     }
     case MessageKey.CHUPDATE: {
