@@ -109,7 +109,9 @@
                     room.AllowGuests,
                     room.IsSecret,
                     room.MaxUsers,
-                    room.LastModified);
+                    room.LastModified,
+                    room.AllowMedia,
+                    room.AllowLinks);
 
                 state.AddOrUpdateChannel(ch);
 
@@ -212,6 +214,8 @@
                         MaxUsers = chan.MaxUsers,
                         IsSecret = chan.IsSecret,
                         AllowsGuests = chan.AllowsGuests,
+                        AllowMedia = chan.AllowsMedia,
+                        AllowLinks = chan.AllowsLinks,
                         UserId = req.UserId,
                         Level = info.Level,
                     }

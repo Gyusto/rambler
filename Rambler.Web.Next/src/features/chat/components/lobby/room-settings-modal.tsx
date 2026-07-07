@@ -37,6 +37,8 @@ export function RoomSettingsModal({
   const [name, setName] = useState(conv.name);
   const [description, setDescription] = useState(conv.description ?? "");
   const [allowGuests, setAllowGuests] = useState(true);
+  const [allowMedia, setAllowMedia] = useState(conv.allowMedia);
+  const [allowLinks, setAllowLinks] = useState(conv.allowLinks);
   const [isSecret, setIsSecret] = useState(false);
   const [maxUsers, setMaxUsers] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -70,11 +72,13 @@ export function RoomSettingsModal({
     if (open) {
       setName(conv.name);
       setDescription(conv.description ?? "");
+      setAllowMedia(conv.allowMedia);
+      setAllowLinks(conv.allowLinks);
       setSaved(false);
       setError(null);
       setConfirmDelete(false);
     }
-  }, [open, conv.name, conv.description]);
+  }, [open, conv.name, conv.description, conv.allowMedia, conv.allowLinks]);
 
   useEffect(() => {
     if (open) void loadModerators();
@@ -99,6 +103,8 @@ export function RoomSettingsModal({
         Name: name,
         Description: description,
         AllowGuests: allowGuests,
+        AllowMedia: allowMedia,
+        AllowLinks: allowLinks,
         IsSecret: isSecret,
         MaxUsers: maxUsers,
       } as ChannelDto);
@@ -200,6 +206,19 @@ export function RoomSettingsModal({
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={isSecret} onChange={(e) => setIsSecret(e.target.checked)} />
                 Secret
+              </label>
+            </div>
+          )}
+
+          {canEdit && (
+            <div className="flex gap-5 text-sm text-[var(--text-2)]">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={allowMedia} onChange={(e) => setAllowMedia(e.target.checked)} />
+                Allow media sharing
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={allowLinks} onChange={(e) => setAllowLinks(e.target.checked)} />
+                Allow link sharing
               </label>
             </div>
           )}

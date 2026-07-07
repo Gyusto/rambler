@@ -13,6 +13,8 @@
             None = 5,
             AlreadyInChannel = 6,
             NoGuestsAllowed = 7,
+            MediaNotAllowed = 8,
+            LinkNotAllowed = 9,
         }
 
         public int Code { get; set; }

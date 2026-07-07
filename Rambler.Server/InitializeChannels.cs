@@ -113,6 +113,8 @@ namespace Rambler.Server
                 Name = LobbyName,
                 Description = "Welcome to the Lobby!",
                 AllowGuests = true,
+                AllowMedia = true,
+                AllowLinks = true,
                 IsSecret = false,
                 MaxUsers = 100,
             });

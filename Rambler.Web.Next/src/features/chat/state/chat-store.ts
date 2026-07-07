@@ -98,6 +98,8 @@ const errorText: Record<number, string> = {
   [ErrorCode.NotAuthenticated]: "Your session expired. Please sign in again.",
   [ErrorCode.NickInUse]: "That nickname is already in use.",
   [ErrorCode.AlreadyInChannel]: "You're already in that room.",
+  [ErrorCode.MediaNotAllowed]: "Media sharing is disabled in this channel.",
+  [ErrorCode.LinkNotAllowed]: "Link sharing is disabled in this channel.",
 };
 
 export const getToken = () => authToken;
@@ -154,6 +156,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       users: [],
       unread: 0,
       myLevel: 0,
+      allowMedia: true,
+      allowLinks: true,
     };
     set({
       conversations: { ...conversations, [userId]: conv },
@@ -369,6 +373,8 @@ function handle(msg: ResponseEnvelope, set: Setter, get: Getter) {
         users: existing?.users ?? [],
         unread: 0,
         myLevel: d.Level,
+        allowMedia: d.AllowMedia ?? true,
+        allowLinks: d.AllowLinks ?? true,
       };
       set({
         conversations: { ...conversations, [d.ChannelId]: conv },
@@ -472,7 +478,13 @@ function handle(msg: ResponseEnvelope, set: Setter, get: Getter) {
     }
     case MessageKey.CHUPDATE: {
       const d = msg.Data as ChannelUpdateData;
-      patchConv(get, set, msg.Subscription, (c) => ({ ...c, name: d.Name, description: d.Description }));
+      patchConv(get, set, msg.Subscription, (c) => ({
+        ...c,
+        name: d.Name,
+        description: d.Description,
+        allowMedia: d.AllowMedia ?? c.allowMedia,
+        allowLinks: d.AllowLinks ?? c.allowLinks,
+      }));
       break;
     }
     case MessageKey.DM: {
@@ -488,7 +500,7 @@ function handle(msg: ResponseEnvelope, set: Setter, get: Getter) {
         set({
           conversations: {
             ...conversations,
-            [counterpart]: { id: counterpart, kind: "dm", name, messages: [], users: [], unread: 0, myLevel: 0 },
+            [counterpart]: { id: counterpart, kind: "dm", name, messages: [], users: [], unread: 0, myLevel: 0, allowMedia: true, allowLinks: true },
           },
           order: [...order, counterpart],
         });
@@ -518,6 +530,13 @@ function handle(msg: ResponseEnvelope, set: Setter, get: Getter) {
     }
     case MessageKey.ERROR: {
       const code = (msg.Data as { Code: number }).Code;
+      // Media/link blocks are per-channel: surface them as a system message in
+      // the active conversation rather than a global error banner.
+      if (code === ErrorCode.MediaNotAllowed || code === ErrorCode.LinkNotAllowed) {
+        const activeId = get().activeId;
+        if (activeId) systemMessage(activeId, errorText[code], get, set);
+        break;
+      }
       set({ error: errorText[code] ?? "Something went wrong." });
       break;
     }

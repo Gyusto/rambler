@@ -62,6 +62,8 @@ export interface JoinData {
   MaxUsers: number;
   IsSecret: boolean;
   AllowsGuests: boolean;
+  AllowMedia: boolean;
+  AllowLinks: boolean;
   Level: number;
 }
 
@@ -148,6 +150,8 @@ export interface ChannelUpdateData {
   Name: string;
   Description: string;
   AllowsGuests: boolean;
+  AllowMedia: boolean;
+  AllowLinks: boolean;
   IsSecret: boolean;
   MaxUsers: number;
   LastModified: string;
@@ -204,6 +208,8 @@ export enum ErrorCode {
   None = 5,
   AlreadyInChannel = 6,
   NoGuestsAllowed = 7,
+  MediaNotAllowed = 8,
+  LinkNotAllowed = 9,
 }
 
 // --- Outbound payloads ----------------------------------------------------
@@ -239,4 +245,6 @@ export interface ListChannel {
   Description: string;
   UserCount: number;
   MaxUsers: number;
+  AllowMedia: boolean;
+  AllowLinks: boolean;
 }
