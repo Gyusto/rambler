@@ -362,6 +362,48 @@
             return Ok();
         }
 
+        /// <summary>
+        /// Set (or reset) the global notification sound. An empty URL removes the
+        /// override, falling back to the client default.
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> SetNotificationSound([FromBody] NotificationSoundRequest request)
+        {
+            var user = await GetUser();
+
+            if (user == null || user.Level < ApplicationUser.UserLevel.Admin)
+            {
+                return Unauthorized();
+            }
+
+            var existing = await db.AppSettings
+                .SingleOrDefaultAsync(s => s.Key == "notification.sound");
+
+            if (string.IsNullOrWhiteSpace(request?.Url))
+            {
+                if (existing != null)
+                {
+                    db.AppSettings.Remove(existing);
+                }
+            }
+            else if (existing == null)
+            {
+                db.AppSettings.Add(new AppSetting
+                {
+                    Key = "notification.sound",
+                    Value = request.Url,
+                });
+            }
+            else
+            {
+                existing.Value = request.Url;
+            }
+
+            await db.SaveChangesAsync();
+
+            return Ok();
+        }
+
         private async Task<(Guid?, string)> LookupUser(Guid? userId, string nick)
         {
             if (userId.HasValue && userId != Guid.Empty)
@@ -496,6 +538,13 @@
         protected virtual async Task<ApplicationUser> GetUser()
         {
             return await userManager.GetUserAsync(User);
+        }
+
+        /// <summary>Body for setting the global notification sound URL.</summary>
+        public class NotificationSoundRequest
+        {
+            /// <summary>The sound URL, or null/empty to reset to the default.</summary>
+            public string Url { get; set; }
         }
     }
 }

@@ -38,6 +38,8 @@
 
         public DbSet<BlogPostState> BlogPostStates { get; set; }
 
+        public DbSet<AppSetting> AppSettings { get; set; }
+
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
             : base(options)
         {
@@ -99,6 +101,10 @@
 
             builder.Entity<BlogPostState>()
                 .HasIndex(c => c.Slug)
+                .IsUnique();
+
+            builder.Entity<AppSetting>()
+                .HasIndex(c => c.Key)
                 .IsUnique();
 
             // Customize the ASP.NET Identity model and override the defaults if needed.

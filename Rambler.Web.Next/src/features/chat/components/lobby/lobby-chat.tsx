@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TopBar } from "@/features/chat/components/lobby/topbar";
 import { MessageStream } from "@/features/chat/components/lobby/message-stream";
 import { Composer } from "@/features/chat/components/lobby/composer";
@@ -9,10 +9,20 @@ import { RoomsRail } from "@/features/chat/components/lobby/rooms-rail";
 import { AppHeader } from "@/features/chat/components/lobby/app-header";
 import { NoRoomsView } from "@/features/chat/components/lobby/no-rooms-view";
 import { useChatStore } from "@/features/chat/state/chat-store";
+import { useNotifications } from "@/features/chat/state/use-notifications";
+import { statusApi } from "@/features/chat/api/status.api";
 
 export function LobbyChat() {
   const [membersOpen, setMembersOpen] = useState(false);
   const [railOpen, setRailOpen] = useState(false);
+
+  // Load the admin-configured custom notification sound once, on mount.
+  useEffect(() => {
+    statusApi
+      .getConfig()
+      .then((res) => useNotifications.getState().setSoundUrl(res.NotificationSoundUrl))
+      .catch(() => {});
+  }, []);
   const error = useChatStore((s) => s.error);
   const clearError = useChatStore((s) => s.clearError);
   const hasActiveConversation = useChatStore(
